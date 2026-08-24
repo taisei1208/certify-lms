@@ -89,7 +89,14 @@ final class OnboardAction
                 'オンボーディング完了',
             );
 
+            $attrs['status'] = UserStatus::InProgress->value;
+
             $user->forceFill($attrs)->save();
+
+            $invitation->update([
+                'status' => InvitationStatus::Accepted->value,
+                'accepted_at' => $now,
+            ]);
 
             // 面談クォータは受講生固有の消費対象。コーチは面談を提供する側のため初期付与しない。
             if ($user->role === UserRole::Student && $user->plan->default_meeting_quota > 0) {
