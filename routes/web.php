@@ -25,6 +25,8 @@ use App\Http\Controllers\MockExamQuestionController;
 use App\Http\Controllers\MockExamSessionController;
 use App\Http\Controllers\MockExamSessionMonitorController;
 use App\Http\Controllers\PartController;
+use App\Http\Controllers\QaReplyController;
+use App\Http\Controllers\QaThreadController;
 use App\Http\Controllers\QuestionCategoryController;
 use App\Http\Controllers\QuizHistoryController;
 use App\Http\Controllers\QuizStatsController;
@@ -474,3 +476,37 @@ if (app()->environment('local')) {
         return view('_dev.components');
     })->name('_dev.components');
 }
+
+// ============================================================
+// 受講生・コーチ共有 — 質問掲示板
+// ============================================================
+Route::middleware(['auth', 'role:student,coach', 'active-learning'])->group(function () {
+    Route::resource('qa-board', QaThreadController::class)
+        ->parameters(['qa-board' => 'thread'])
+        ->names('qa-board');
+
+    Route::post('qa-board/{thread}/resolve', [QaThreadController::class, 'resolve'])->name('qa-board.resolve');
+
+    Route::post('qa-board/{thread}/unresolve', [QaThreadController::class, 'unresolve'])->name('qa-board.unresolve');
+
+    Route::resource('qa-board.replies', QaReplyController::class)
+        ->parameters(['qa-board' => 'thread', 'replies' => 'reply'])
+        ->only(['store', 'edit', 'update', 'destroy'])
+        ->scoped()
+        ->names('qa-board.replies');
+});
+
+// ============================================================
+// 管理者専用 — 質問掲示板
+// ============================================================
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('admin')
+    ->group(function () {
+        Route::resource('qa-board', QaThreadController::class)
+            ->parameters(['qa-board' => 'thread'])
+            ->only(['index', 'show', 'destroy'])
+            ->names('admin.qa-board');
+
+        Route::delete('{thread}/replies/{reply}', [QaReplyController::class, 'destroy'])
+            ->name('admin.qa-board.replies.destroy');
+    });
