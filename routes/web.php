@@ -17,6 +17,7 @@ use App\Http\Controllers\EnrollmentManagementController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
 use App\Http\Controllers\MeetingController;
+use App\Http\Controllers\MeetingPackController;
 use App\Http\Controllers\MeetingQuotaHistoryController;
 use App\Http\Controllers\MockExamAnswerController;
 use App\Http\Controllers\MockExamCatalogController;
@@ -509,4 +510,21 @@ Route::middleware(['auth', 'role:admin'])
 
         Route::delete('{thread}/replies/{reply}', [QaReplyController::class, 'destroy'])
             ->name('admin.qa-board.replies.destroy');
+    });
+
+// ============================================================
+// 管理者専用 - 面談パックのマスタ管理
+// ============================================================
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('meeting-packs', MeetingPackController::class)
+            ->parameters(['meeting-packs' => 'plan']);
+
+        Route::post('meeting-packs/{plan}/publish', [MeetingPackController::class, 'publish'])->name('meeting-packs.publish');
+
+        Route::post('meeting-packs/{plan}/archive', [MeetingPackController::class, 'archive'])->name('meeting-packs.archive');
+
+        Route::post('meeting-packs/{plan}/unarchive', [MeetingPackController::class, 'unarchive'])->name('meeting-packs.unarchive');
     });
