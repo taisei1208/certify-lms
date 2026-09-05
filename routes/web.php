@@ -26,6 +26,7 @@ use App\Http\Controllers\MockExamQuestionController;
 use App\Http\Controllers\MockExamSessionController;
 use App\Http\Controllers\MockExamSessionMonitorController;
 use App\Http\Controllers\PartController;
+use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QaReplyController;
 use App\Http\Controllers\QaThreadController;
 use App\Http\Controllers\QuestionCategoryController;
@@ -527,4 +528,20 @@ Route::middleware(['auth', 'role:admin'])
         Route::post('meeting-packs/{plan}/archive', [MeetingPackController::class, 'archive'])->name('meeting-packs.archive');
 
         Route::post('meeting-packs/{plan}/unarchive', [MeetingPackController::class, 'unarchive'])->name('meeting-packs.unarchive');
+    });
+
+// ============================================================
+// 管理者専用 - プランのマスタ管理
+// ============================================================
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('plans', PlanController::class);
+
+        Route::post('plans/{plan}/publish', [PlanController::class, 'publish'])->name('plans.publish');
+
+        Route::post('plans/{plan}/archive', [PlanController::class, 'archive'])->name('plans.archive');
+
+        Route::post('plans/{plan}/unarchive', [PlanController::class, 'unarchive'])->name('plans.unarchive');
     });
