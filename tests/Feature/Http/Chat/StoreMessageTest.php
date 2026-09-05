@@ -10,8 +10,10 @@ use App\Models\ChatMember;
 use App\Models\ChatRoom;
 use App\Models\Enrollment;
 use App\Models\User;
+use App\Notifications\ChatMessageReceiveNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -190,5 +192,50 @@ class StoreMessageTest extends TestCase
         $this->actingAs($student)
             ->delete("/chat-rooms/{$room->id}/messages/{$messageId}")
             ->assertNotFound();
+    }
+
+    public function test_chat_message_receive_notifies(): void
+    {
+        Notification::fake();
+
+        $sender = User::factory()->student()->inProgress()->create();
+        $coach = User::factory()->coach()->inProgress()->create();
+        $admin = User::factory()->admin()->inProgress()->create();
+        $certification = Certification::factory()
+            ->published()
+            ->create();
+
+        $certification->coaches()->attach($coach->id, [
+            'id' => (string) Str::ulid(),
+            'assigned_by_user_id' => $admin->id,
+            'assigned_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $enrollment = Enrollment::factory()->for($sender)->for($certification)->create();
+        $room = ChatRoom::factory()->for($enrollment)->create();
+        ChatMember::factory()->create(['chat_room_id' => $room->id, 'user_id' => $sender->id]);
+        ChatMember::factory()->create(['chat_room_id' => $room->id, 'user_id' => $coach->id]);
+
+        $response = $this->actingAs($sender)
+            ->post(route('chat.storeMessage', $room), ['body' => 'こんにちは、相談したいです。']);
+
+        Notification::assertSentTo(
+            $coach,
+            ChatMessageReceiveNotification::class,
+            function (
+                ChatMessageReceiveNotification $notification,
+                array $channels,
+            ): bool {
+                return in_array('database', $channels, true)
+                    && in_array('mail', $channels, true);
+            },
+        );
+
+        Notification::assertNotSentTo(
+            $sender,
+            ChatMessageReceiveNotification::class,
+        );
     }
 }

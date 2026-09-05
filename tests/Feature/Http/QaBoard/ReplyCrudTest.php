@@ -10,7 +10,9 @@ use App\Models\CertificationCoachAssignment;
 use App\Models\QaReply;
 use App\Models\QaThread;
 use App\Models\User;
+use App\Notifications\QaReplyReceivedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class ReplyCrudTest extends TestCase
@@ -379,5 +381,49 @@ class ReplyCrudTest extends TestCase
                 ]),
             )
             ->assertNotFound();
+    }
+
+    public function test_reply_notifies_thread_author(): void
+    {
+        Notification::fake();
+
+        $author = User::factory()->student()->create();
+        $replyAuthor = User::factory()->student()->create();
+        $certification = Certification::factory()
+            ->published()
+            ->create();
+
+        $thread = QaThread::factory()
+            ->for($author, 'user')
+            ->for($certification)
+            ->create();
+
+        $this->actingAs($replyAuthor)
+            ->post(
+                route('qa-board.replies.store', $thread),
+                [
+                    'body' => '質問への回答です。',
+                ],
+            )
+            ->assertRedirect(
+                route('qa-board.show', $thread),
+            );
+
+        Notification::assertSentTo(
+            $author,
+            QaReplyReceivedNotification::class,
+            function (
+                QaReplyReceivedNotification $notification,
+                array $channels,
+            ): bool {
+                return in_array('database', $channels, true)
+                    && in_array('mail', $channels, true);
+            },
+        );
+
+        Notification::assertNotSentTo(
+            $replyAuthor,
+            QaReplyReceivedNotification::class,
+        );
     }
 }

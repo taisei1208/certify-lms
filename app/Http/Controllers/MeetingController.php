@@ -20,9 +20,12 @@ use App\Models\Enrollment;
 use App\Models\Meeting;
 use App\Models\MeetingMemo;
 use App\Models\User;
+use App\Notifications\MeetingCanceledNotification;
+use App\Notifications\MeetingReservedNotification;
 use App\Services\CoachMeetingLoadService;
 use App\Services\MeetingAvailabilityService;
 use App\Services\MeetingQuotaService;
+use App\Services\NotificationRecipientService;
 use App\UseCases\MeetingQuota\ConsumeQuotaAction;
 use App\UseCases\MeetingQuota\RefundQuotaAction;
 use Carbon\Carbon;
@@ -213,6 +216,18 @@ class MeetingController extends Controller
             $transaction = ($consumeAction)($student, $meeting->id);
             $meeting->update(['meeting_quota_transaction_id' => $transaction->id]);
 
+            if ($this->recipients->canReceive($coach)) {
+                DB::afterCommit(function () use ($meeting): void {
+                    try {
+                        $meeting->coach->notify(
+                            new MeetingReservedNotification($meeting),
+                        );
+                    } catch (\Throwable $exception) {
+                        report($exception);
+                    }
+                });
+            }
+
             return $meeting->fresh();
         });
 
@@ -250,6 +265,27 @@ class MeetingController extends Controller
             ]);
 
             ($refundAction)($locked->student, $locked->id);
+
+            /*
+             * キャンセル実行者ではない方を通知対象にする。
+             *
+             * 受講生がキャンセル → コーチ
+             * コーチがキャンセル → 受講生
+             */
+            $recipient = $actor->id === $locked->student_id
+                ? $locked->coach
+                : $locked->student;
+
+            if ($this->recipients->canReceive($recipient)) {
+                DB::afterCommit(function () use ($locked, $recipient): void {
+                    try {
+                        $recipient->notify(new MeetingCanceledNotification($locked)
+                        );
+                    } catch (\Throwable $exception) {
+                        report($exception);
+                    }
+                });
+            }
         });
 
         return redirect()
@@ -324,4 +360,8 @@ class MeetingController extends Controller
             })
             ->get();
     }
+
+    public function __construct(
+        private readonly NotificationRecipientService $recipients,
+    ) {}
 }
