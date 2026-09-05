@@ -9,11 +9,11 @@ use App\Models\Plan;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * admin 用プラン一覧の絞り込みリクエスト。keyword / status / の 2 種フィルタ。
+ */
 class IndexRequest extends FormRequest
 {
-    /**
-     * admin 用プラン一覧の絞り込みリクエスト。keyword / status / の 2 種フィルタ。
-     */
     public function authorize(): bool
     {
         return $this->user()?->can('viewAny',

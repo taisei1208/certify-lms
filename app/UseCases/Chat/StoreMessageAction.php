@@ -9,6 +9,8 @@ use App\Models\ChatMember;
 use App\Models\ChatMessage;
 use App\Models\ChatRoom;
 use App\Models\User;
+use App\Notifications\ChatMessageReceiveNotification;
+use App\Services\NotificationRecipientService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,6 +23,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class StoreMessageAction
 {
+    public function __construct(
+        private readonly NotificationRecipientService $recipients,
+    ) {}
+
     /**
      * @param array{body: string} $validated
      */
@@ -33,13 +39,32 @@ final class StoreMessageAction
                 'body' => $validated['body'],
             ]);
 
+            $recipients = $room->members()
+                ->with('user')
+                ->where('user_id', '!=', $sender->id)
+                ->get()
+                ->pluck('user')
+                ->filter(
+                    fn (User $user) => $this->recipients->canReceive($user),
+                );
+
             ChatMember::query()
                 ->where('chat_room_id', $room->id)
                 ->where('user_id', $sender->id)
                 ->update(['last_read_at' => now()]);
 
-            DB::afterCommit(function () use ($message): void {
+            DB::afterCommit(function () use ($message, $recipients): void {
                 broadcast(new ChatMessageSent($message->load('sender')))->toOthers();
+
+                foreach ($recipients as $recipient) {
+                    try {
+                        $recipient->notify(
+                            new ChatMessageReceiveNotification($message),
+                        );
+                    } catch (\Throwable $exception) {
+                        report($exception);
+                    }
+                }
             });
 
             return $message;

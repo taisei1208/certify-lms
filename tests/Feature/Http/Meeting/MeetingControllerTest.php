@@ -11,8 +11,11 @@ use App\Models\CoachAvailability;
 use App\Models\Enrollment;
 use App\Models\Meeting;
 use App\Models\User;
+use App\Notifications\MeetingCanceledNotification;
+use App\Notifications\MeetingReservedNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -315,5 +318,77 @@ class MeetingControllerTest extends TestCase
             'type' => MeetingQuotaTransactionType::Refunded->value,
             'amount' => 1,
         ]);
+    }
+
+    public function test_meeting_reserve_notifies_coach(): void
+    {
+        Notification::fake();
+
+        $student = User::factory()->student()->create([
+            'max_meetings' => 3,
+        ]);
+        $admin = User::factory()->admin()->create();
+        $coach = User::factory()->coach()->inProgress()->create([
+            'meeting_url' => 'https://meet.example.com/coach-room',
+        ]);
+        $certification = Certification::factory()->published()->create();
+        $this->attachCoach($certification, $coach, $admin);
+
+        CoachAvailability::factory()->forCoach($coach)->onDay(1)->timeRange('09:00:00', '18:00:00')->create();
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+        $scheduledAt = now()->startOfDay()->next(Carbon::MONDAY)->setTime(10, 0); // 次の月曜 10:00(未来)
+
+        $this->actingAs($student)->post(route('meetings.store', $enrollment), [
+            'scheduled_at' => $scheduledAt->format('Y-m-d\TH:i:s'),
+            'topic' => '相談したい',
+        ]);
+
+        Notification::assertSentTo(
+            $coach,
+            MeetingReservedNotification::class,
+            function (
+                MeetingReservedNotification $notification,
+                array $channels,
+            ): bool {
+                return in_array('database', $channels, true)
+                    && in_array('mail', $channels, true);
+            },
+        );
+
+        Notification::assertNotSentTo(
+            $student,
+            MeetingReservedNotification::class,
+        );
+    }
+
+    public function test_meeting_cancel_notifies_(): void
+    {
+        Notification::fake();
+
+        $canceler = User::factory()->student()->create();
+        $recipient = User::factory()->coach()->inProgress()->create();
+        $meeting = Meeting::factory()->reserved()->forCoach($recipient)->forStudent($canceler)->create([
+            'scheduled_at' => now()->addDays(3)->startOfHour(),
+        ]);
+
+        $this->actingAs($canceler)->post(route('meetings.cancel', $meeting));
+
+        Notification::assertSentTo(
+            $recipient,
+            MeetingCanceledNotification::class,
+            function (
+                MeetingCanceledNotification $notification,
+                array $channels,
+            ): bool {
+                return in_array('database', $channels, true)
+                    && in_array('mail', $channels, true);
+            },
+        );
+
+        Notification::assertNotSentTo(
+            $canceler,
+            MeetingCanceledNotification::class,
+        );
     }
 }
