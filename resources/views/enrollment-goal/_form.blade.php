@@ -1,7 +1,7 @@
 {{--
-    個人目標の追加フォーム + 一覧(受講詳細ページの「個人目標」カード内)。
-    構成: 新規追加フォーム(目標 / 期日 / 詳細) → 0 件メッセージ → 目標リスト(達成アイコン + 本文 + 期日/達成日 + 達成・未達成・編集・削除の各操作)。
-    閲覧者の権限で追加フォーム・各操作の表示を出し分け。削除は confirm() で誤操作防止(JS なし)。
+個人目標の追加フォーム + 一覧(受講詳細ページの「個人目標」カード内)。
+構成: 新規追加フォーム(目標 / 期日 / 詳細) → 0 件メッセージ → 目標リスト(達成アイコン + 本文 + 期日/達成日 + 達成・未達成・編集・削除の各操作)。
+閲覧者の権限で追加フォーム・各操作の表示を出し分け。削除は confirm() で誤操作防止(JS なし)。
 --}}
 @php
     use App\Models\EnrollmentGoal;
@@ -11,32 +11,15 @@
 @endphp
 
 @can('create', [EnrollmentGoal::class, $enrollment])
-    <form novalidate method="POST" action="{{ route('enrollments.goals.store', $enrollment) }}" class="space-y-3 pb-4 border-b border-ink-100">
+    <form novalidate method="POST" action="{{ route('enrollments.goals.store', $enrollment) }}"
+        class="space-y-3 pb-4 border-b border-ink-100">
         @csrf
-        <x-form.input
-            name="title"
-            label="目標"
-            :value="old('title')"
-            :error="$errors->first('title')"
-            placeholder="例: 過去問 5 年分を解き終える"
-            maxlength="100"
-            :required="true"
-        />
-        <x-form.input
-            name="target_date"
-            label="目標期日"
-            type="date"
-            :value="old('target_date')"
-            :error="$errors->first('target_date')"
-        />
-        <x-form.textarea
-            name="description"
-            label="詳細(任意)"
-            :rows="2"
-            :value="old('description')"
-            :error="$errors->first('description')"
-            :maxlength="1000"
-        />
+        <x-form.input name="title" label="目標" :value="old('title')" :error="$errors->first('title')"
+            placeholder="例: 過去問 5 年分を解き終える" maxlength="100" :required="true" />
+        <x-form.input name="target_date" label="目標期日" type="date" :value="old('target_date')"
+            :error="$errors->first('target_date')" />
+        <x-form.textarea name="description" label="詳細(任意)" :rows="2" :value="old('description')"
+            :error="$errors->first('description')" :maxlength="1000" />
         <x-button type="submit" variant="primary" size="sm">
             <x-icon name="plus" class="w-4 h-4" />
             目標を追加
@@ -96,11 +79,8 @@
                         </x-link-button>
                     @endcan
                     @can('delete', $goal)
-                        <form novalidate
-                            method="POST"
-                            action="{{ route('enrollment-goals.destroy', $goal) }}"
-                            onsubmit="return confirm('この目標を削除しますか？');"
-                        >
+                        <form novalidate method="POST" action="{{ route('enrollment-goals.destroy', $goal) }}"
+                            onsubmit="return confirm('この目標を削除しますか？');">
                             @csrf
                             @method('DELETE')
                             <x-button type="submit" variant="ghost" size="sm">
