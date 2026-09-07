@@ -1,8 +1,8 @@
 {{--
-    受講登録の詳細ページ。
-    構成: パンくず → 見出し(資格名 + ステータスバッジ) → 学習進捗カード → 修了証受領パネル
-          → 2 カラム(左: 受講情報 + 各種操作フォーム / 状態遷移履歴 / 個人目標、右: 担当コーチ / コーチメモ)。
-    ロール・状態で各カード/フォームの表示を出し分け。削除・学習中止・修了証発行は confirm() で誤操作防止(JS なし)。
+受講登録の詳細ページ。
+構成: パンくず → 見出し(資格名 + ステータスバッジ) → 学習進捗カード → 修了証受領パネル
+→ 2 カラム(左: 受講情報 + 各種操作フォーム / 状態遷移履歴 / 個人目標、右: 担当コーチ / コーチメモ)。
+ロール・状態で各カード/フォームの表示を出し分け。削除・学習中止・修了証発行は confirm() で誤操作防止(JS なし)。
 --}}
 @extends('layouts.app')
 
@@ -13,7 +13,7 @@
     use App\Enums\UserRole;
     use App\Models\EnrollmentNote;
 
-    $statusBadge = fn (EnrollmentStatus $s) => match ($s) {
+    $statusBadge = fn(EnrollmentStatus $s) => match ($s) {
         EnrollmentStatus::Learning => 'info',
         EnrollmentStatus::Passed => 'success',
         EnrollmentStatus::Failed => 'gray',
@@ -27,10 +27,10 @@
 
 @section('content')
     <x-breadcrumb :items="[
-        ['label' => 'ダッシュボード', 'href' => route('dashboard.index')],
-        ['label' => '受講中資格', 'href' => route('enrollments.index')],
-        ['label' => $enrollment->certification->name],
-    ]" />
+            ['label' => 'ダッシュボード', 'href' => route('dashboard.index')],
+            ['label' => '受講中資格', 'href' => route('enrollments.index')],
+            ['label' => $enrollment->certification->name],
+        ]" />
 
     <div class="mt-4 flex items-start justify-between gap-4 flex-wrap">
         <div class="min-w-0">
@@ -43,12 +43,14 @@
             </div>
             <p class="text-sm text-ink-500 mt-1">
                 @if ($isStaff)
-                    受講生: <span class="font-semibold text-ink-700">{{ $enrollment->user?->name }}</span>({{ $enrollment->user?->email }}) ・
+                    受講生: <span
+                        class="font-semibold text-ink-700">{{ $enrollment->user?->name }}</span>({{ $enrollment->user?->email }})
+                    ・
                 @endif
                 {{ $enrollment->certification->category?->name ?? '未分類' }} ・ 現在ターム: {{ $enrollment->current_term->label() }}
             </p>
         </div>
-        @if (! $isStaff && in_array($enrollment->status, [EnrollmentStatus::Learning, EnrollmentStatus::Passed], true))
+        @if (!$isStaff && in_array($enrollment->status, [EnrollmentStatus::Learning, EnrollmentStatus::Passed], true))
             <x-link-button href="{{ route('learning.enrollments.show', $enrollment) }}" variant="primary">
                 <x-icon name="book-open" class="w-4 h-4" />
                 教材を読む
@@ -73,15 +75,18 @@
                 <div class="grid grid-cols-3 gap-3 text-center">
                     <div class="rounded-md bg-ink-50 px-3 py-2">
                         <div class="text-xs text-ink-500">Section</div>
-                        <div class="text-sm font-mono text-ink-900 tabular-nums">{{ $progress->sectionsCompleted }} / {{ $progress->sectionsTotal }}</div>
+                        <div class="text-sm font-mono text-ink-900 tabular-nums">{{ $progress->sectionsCompleted }} /
+                            {{ $progress->sectionsTotal }}</div>
                     </div>
                     <div class="rounded-md bg-ink-50 px-3 py-2">
                         <div class="text-xs text-ink-500">Chapter</div>
-                        <div class="text-sm font-mono text-ink-900 tabular-nums">{{ $progress->chaptersCompleted }} / {{ $progress->chaptersTotal }}</div>
+                        <div class="text-sm font-mono text-ink-900 tabular-nums">{{ $progress->chaptersCompleted }} /
+                            {{ $progress->chaptersTotal }}</div>
                     </div>
                     <div class="rounded-md bg-ink-50 px-3 py-2">
                         <div class="text-xs text-ink-500">Part</div>
-                        <div class="text-sm font-mono text-ink-900 tabular-nums">{{ $progress->partsCompleted }} / {{ $progress->partsTotal }}</div>
+                        <div class="text-sm font-mono text-ink-900 tabular-nums">{{ $progress->partsCompleted }} /
+                            {{ $progress->partsTotal }}</div>
                     </div>
                 </div>
             </div>
@@ -129,12 +134,8 @@
                 @endcan
 
                 @can('delete', $enrollment)
-                    <form novalidate
-                        method="POST"
-                        action="{{ route('enrollments.destroy', $enrollment) }}"
-                        class="mt-4"
-                        onsubmit="return confirm('この受講登録を解除しますか？');"
-                    >
+                    <form novalidate method="POST" action="{{ route('enrollments.destroy', $enrollment) }}" class="mt-4"
+                        onsubmit="return confirm('この受講登録を解除しますか？');">
                         @csrf
                         @method('DELETE')
                         <x-button type="submit" variant="ghost">
@@ -147,18 +148,14 @@
                 {{-- 試験日設定 / 変更フォーム(admin または受講生本人、passed / trashed 時は非表示) --}}
                 @can('updateExamDate', $enrollment)
                     @unless ($enrollment->trashed())
-                        <form novalidate method="POST" action="{{ $isAdmin ? route('admin.enrollments.updateExamDate', $enrollment) : route('enrollments.updateExamDate', $enrollment) }}" class="mt-4 flex items-end gap-3">
+                        <form novalidate method="POST"
+                            action="{{ $isAdmin ? route('admin.enrollments.updateExamDate', $enrollment) : route('enrollments.updateExamDate', $enrollment) }}"
+                            class="mt-4 flex items-end gap-3">
                             @csrf
                             @method('PATCH')
                             <div class="flex-1">
-                                <x-form.input
-                                    name="exam_date"
-                                    label="目標受験日"
-                                    type="date"
-                                    :value="old('exam_date', $enrollment->exam_date?->format('Y-m-d'))"
-                                    :error="$errors->first('exam_date')"
-                                    hint="本番試験の予定日。ダッシュボードの試験日カウントダウンに使われます。"
-                                />
+                                <x-form.input name="exam_date" label="目標受験日" type="date" :value="old('exam_date', $enrollment->exam_date?->format('Y-m-d'))" :error="$errors->first('exam_date')"
+                                    hint="本番試験の予定日。ダッシュボードの試験日カウントダウンに使われます。" />
                             </div>
                             <x-button type="submit" variant="outline">{{ $enrollment->exam_date ? '更新' : '設定' }}</x-button>
                         </form>
@@ -166,21 +163,12 @@
                 @endcan
 
                 {{-- 手動学習中止フォーム(admin のみ、learning 状態かつ未削除のみ) --}}
-                @if ($isAdmin && $enrollment->status === EnrollmentStatus::Learning && ! $enrollment->trashed())
-                    <form novalidate
-                        method="POST"
-                        action="{{ route('admin.enrollments.fail', $enrollment) }}"
-                        class="mt-4 space-y-2"
-                        onsubmit="return confirm('この受講登録を学習中止にしますか？');"
-                    >
+                @if ($isAdmin && $enrollment->status === EnrollmentStatus::Learning && !$enrollment->trashed())
+                    <form novalidate method="POST" action="{{ route('admin.enrollments.fail', $enrollment) }}"
+                        class="mt-4 space-y-2" onsubmit="return confirm('この受講登録を学習中止にしますか？');">
                         @csrf
-                        <x-form.input
-                            name="reason"
-                            label="学習中止の理由(任意)"
-                            :value="old('reason')"
-                            :error="$errors->first('reason')"
-                            maxlength="200"
-                        />
+                        <x-form.input name="reason" label="学習中止の理由(任意)" :value="old('reason')" :error="$errors->first('reason')"
+                            maxlength="200" />
                         <x-button type="submit" variant="danger">
                             <x-icon name="x-mark" class="w-4 h-4" />
                             学習中止にする

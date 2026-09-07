@@ -13,6 +13,7 @@ use App\Http\Controllers\ChatRoomController;
 use App\Http\Controllers\ContentSearchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\EnrollmentGoalController;
 use App\Http\Controllers\EnrollmentManagementController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
@@ -556,4 +557,19 @@ Route::middleware(['auth', 'role:student,coach'])->group(function () {
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
 
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
+});
+
+// ============================================================
+// 受講生(受講中)専用 — 個人学習目標
+// ============================================================
+Route::middleware(['auth', 'role:student', 'active-learning'])->group(function () {
+    Route::post('enrollments/{enrollment}/goals', [EnrollmentGoalController::class, 'store'])->name('enrollments.goals.store');
+
+    Route::resource('enrollment-goals', EnrollmentGoalController::class)
+        ->parameters(['enrollment-goals' => 'goal'])
+        ->only(['edit', 'update', 'destroy']);
+
+    Route::post('enrollment-goals/{goal}/achieve', [EnrollmentGoalController::class, 'markAchieved'])->name('enrollment-goals.markAchieved');
+
+    Route::delete('enrollment-goals/{goal}/achieve', [EnrollmentGoalController::class, 'unmarkAchieved'])->name('enrollment-goals.unmarkAchieved');
 });

@@ -136,6 +136,14 @@ class Enrollment extends Model
     }
 
     /**
+     * @return HasMany<EnrollmentGoal, $this>
+     */
+    public function goals(): HasMany
+    {
+        return $this->hasMany(EnrollmentGoal::class);
+    }
+
+    /**
      * @return HasOne<LearningHourTarget, $this>
      */
     public function learningHourTarget(): HasOne

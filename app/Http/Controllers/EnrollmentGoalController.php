@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\EnrollmentGoal\StoreRequest;
+use App\Http\Requests\EnrollmentGoal\UpdateRequest;
+use App\Models\Enrollment;
+use App\Models\EnrollmentGoal;
+use App\UseCases\EnrollmentGoal\DestroyAction;
+use App\UseCases\EnrollmentGoal\MarkAchievedAction;
+use App\UseCases\EnrollmentGoal\StoreAction;
+use App\UseCases\EnrollmentGoal\UnmarkAchievedAction;
+use App\UseCases\EnrollmentGoal\UpdateAction;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
+
+/**
+ * 個人学習目標の管理Controller。
+ *
+ * 目標一覧と追加フォームはEnrollment詳細画面に表示し、
+ * 編集のみ専用画面を使用する。
+ */
+class EnrollmentGoalController extends Controller
+{
+    public function store(StoreRequest $request, Enrollment $enrollment, StoreAction $action): RedirectResponse
+    {
+        $action($enrollment, $request->validated());
+
+        return redirect()
+            ->route('enrollments.show', $enrollment)
+            ->with('success', '目標を追加しました。');
+    }
+
+    public function edit(EnrollmentGoal $goal): View
+    {
+        $this->authorize('update', $goal);
+
+        return view('enrollment-goal.edit', ['goal' => $goal]);
+    }
+
+    public function update(UpdateRequest $request, EnrollmentGoal $goal, UpdateAction $action): RedirectResponse
+    {
+        $action($goal, $request->validated());
+
+        return redirect()
+            ->route('enrollments.show', $goal->enrollment_id)
+            ->with('success', '目標を更新しました。');
+    }
+
+    public function destroy(EnrollmentGoal $goal, DestroyAction $action): RedirectResponse
+    {
+        $this->authorize('delete', $goal);
+
+        $enrollmentId = $goal->enrollment_id;
+
+        $action($goal);
+
+        return redirect()
+            ->route('enrollments.show', $enrollmentId)
+            ->with('success', '目標を削除しました。');
+    }
+
+    public function markAchieved(EnrollmentGoal $goal, MarkAchievedAction $action): RedirectResponse
+    {
+        $this->authorize('markAchieved', $goal);
+
+        $action($goal);
+
+        return redirect()
+            ->route('enrollments.show', $goal->enrollment_id)
+            ->with('success', '目標を達成済みにしました。');
+    }
+
+    public function unmarkAchieved(EnrollmentGoal $goal, UnmarkAchievedAction $action): RedirectResponse
+    {
+        $this->authorize('unmarkAchieved', $goal);
+
+        $action($goal);
+
+        return redirect()
+            ->route('enrollments.show', $goal->enrollment_id)
+            ->with('success', '目標を未達成に戻しました。');
+    }
+}
