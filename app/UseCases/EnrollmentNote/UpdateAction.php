@@ -14,7 +14,7 @@ final class UpdateAction
     public function __invoke(EnrollmentNote $note, array $validated): EnrollmentNote
     {
         $note->update([
-            'body' => $validated['body']
+            'body' => $validated['body'],
         ]);
 
         return $note->refresh();

@@ -15,7 +15,6 @@ use Illuminate\Database\Seeder;
  * - 複数の受講生・複数の資格・複数のコーチにまたがってメモ
  * - 自分が作成したメモと他コーチが作成したメモを混在させる（編集 / 削除の出し分け・管理者の越境操作を確認）
  * - コーチの担当資格と担当外資格の両方の受講登録があり、受講生本人の受講登録にもメモがある（担当外での閲覧拒否・受講生にはメモが見えない分離を確認）
-
  */
 class EnrollmentNoteSeeder extends Seeder
 {
@@ -37,16 +36,15 @@ class EnrollmentNoteSeeder extends Seeder
             ->where('email', 'student@certify-lms.test')
             ->first();
 
-        if ($admin === null || $coach1 === null || $coach2 === null || $fixedStudent === null)
-        {
+        if ($admin === null || $coach1 === null || $coach2 === null || $fixedStudent === null) {
             $this->command?->warn('EnrollmentNoteSeeder: 固定ユーザーが不足しています。');
 
             return;
         }
 
-        $this->seedSharedCertification($admin, $coach1, $coach2,$fixedStudent);
+        $this->seedSharedCertification($admin, $coach1, $coach2, $fixedStudent);
 
-        $this->seedCoachOnlyCertifications($coach1, $coach2,$fixedStudent);
+        $this->seedCoachOnlyCertifications($coach1, $coach2, $fixedStudent);
 
         $this->seedOtherStudent($coach1, $fixedStudent);
     }
@@ -65,7 +63,7 @@ class EnrollmentNoteSeeder extends Seeder
                 )
             )
             ->whereHas('certification.coaches',
-            fn ($query) => $query->where(
+                fn ($query) => $query->where(
                     'users.id', $coach2->id
                 )
             )
@@ -167,8 +165,7 @@ class EnrollmentNoteSeeder extends Seeder
      * 複数受講生にまたがる状態にする。
      */
     private function seedOtherStudent(User $coach, User $fixedStudent
-    ): void
-    {
+    ): void {
         $enrollment = Enrollment::query()
             ->where(
                 'user_id', '!=', $fixedStudent->id,
@@ -197,7 +194,7 @@ class EnrollmentNoteSeeder extends Seeder
         );
     }
 
-    private function createNote(Enrollment $enrollment, User $author,string $body, int $daysAgo): void
+    private function createNote(Enrollment $enrollment, User $author, string $body, int $daysAgo): void
     {
         $createdAt = now()
             ->subDays($daysAgo)

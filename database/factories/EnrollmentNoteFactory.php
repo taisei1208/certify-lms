@@ -24,7 +24,7 @@ class EnrollmentNoteFactory extends Factory
         return [
             'enrollment_id' => Enrollment::factory(),
             'author_user_id' => User::factory()->coach()->inProgress(),
-            'body' => fake()->realTextBetween(50, 300)
+            'body' => fake()->realTextBetween(50, 300),
         ];
     }
 }

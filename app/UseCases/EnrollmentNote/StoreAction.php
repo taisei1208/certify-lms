@@ -17,7 +17,7 @@ final class StoreAction
     {
         return $enrollment->notes()->create([
             'author_user_id' => $author->id,
-            'body' => $validated['body']
+            'body' => $validated['body'],
         ]);
     }
 }

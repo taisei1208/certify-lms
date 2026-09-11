@@ -26,7 +26,7 @@ class EnrollmentNotePolicy
     {
         $enrollment = $note->enrollment;
 
-        if ($enrollment === null){
+        if ($enrollment === null) {
             return false;
         }
 
@@ -45,7 +45,7 @@ class EnrollmentNotePolicy
     {
         $enrollment = $note->enrollment;
 
-        if ($enrollment === null){
+        if ($enrollment === null) {
             return false;
         }
 
@@ -69,6 +69,7 @@ class EnrollmentNotePolicy
             ->where('certifications.id', $enrollment->certification_id)
             ->exists();
     }
+
     private function canAccessEnrollment(User $auth, Enrollment $enrollment): bool
     {
         return match ($auth->role) {

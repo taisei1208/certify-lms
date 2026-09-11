@@ -17,8 +17,7 @@ use Illuminate\View\View;
 class EnrollmentNoteController extends Controller
 {
     public function store(StoreRequest $request, Enrollment $enrollment, StoreAction $action,
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $action($enrollment, $request->user(), $request->validated());
 
         return redirect()
@@ -42,9 +41,8 @@ class EnrollmentNoteController extends Controller
             ->with('success', 'メモを更新しました。');
     }
 
-    public function destroy(EnrollmentNote $note,DestroyAction $action
-    ): RedirectResponse
-    {
+    public function destroy(EnrollmentNote $note, DestroyAction $action
+    ): RedirectResponse {
         $this->authorize('delete', $note);
 
         $enrollmentId = $note->enrollment_id;

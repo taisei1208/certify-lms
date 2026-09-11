@@ -769,8 +769,7 @@ class CrudTest extends TestCase
         return CertificationCoachAssignment::factory()
             ->create([
                 'user_id' => $coach->id,
-                'certification_id' =>
-                    $certification->id,
+                'certification_id' => $certification->id,
                 'assigned_by_user_id' => $admin->id,
                 'assigned_at' => now(),
                 'unassigned_at' => null,
