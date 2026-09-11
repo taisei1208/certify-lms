@@ -15,6 +15,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentGoalController;
 use App\Http\Controllers\EnrollmentManagementController;
+use App\Http\Controllers\EnrollmentNoteController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
 use App\Http\Controllers\MeetingController;
@@ -591,4 +592,16 @@ Route::middleware('auth')
         Route::delete('avatar', [SettingsProfileController::class, 'destroyAvatar'])->name('avatar.destroy');
 
         Route::put('password', [SettingsProfileController::class, 'updatePassword'])->name('password.update');
+    });
+
+// ============================================================
+// 受講生メモ
+// ============================================================
+Route::middleware('auth')
+    ->group(function () {
+        Route::post('enrollments/{enrollment}/notes', [EnrollmentNoteController::class, 'store'])->name('enrollments.notes.store');
+
+        Route::resource('enrollment-notes', EnrollmentNoteController::class)
+            ->only(['edit', 'update', 'destroy'])
+            ->parameters(['enrollment-notes' => 'note']);
     });

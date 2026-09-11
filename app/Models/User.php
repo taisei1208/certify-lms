@@ -326,4 +326,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(QaReply::class, 'user_id');
     }
+
+    /**
+     * @return HasMany<EnrollmentNote, $this>
+     */
+    public function authoredEnrollmentNotes(): HasMany
+    {
+        return $this->hasMany(EnrollmentNote::class, 'author_user_id');
+    }
 }
