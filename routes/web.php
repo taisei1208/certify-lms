@@ -44,6 +44,7 @@ use App\Http\Controllers\SectionQuizController;
 use App\Http\Controllers\SectionQuizResultController;
 use App\Http\Controllers\Settings\AvailabilityController as SettingsAvailabilityController;
 use App\Http\Controllers\Settings\SettingsDefaultEnrollmentController;
+use App\Http\Controllers\SettingsProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WeakDrillController;
 use App\Http\Controllers\WeakDrillResultController;
@@ -573,3 +574,21 @@ Route::middleware(['auth', 'role:student', 'active-learning'])->group(function (
 
     Route::delete('enrollment-goals/{goal}/achieve', [EnrollmentGoalController::class, 'unmarkAchieved'])->name('enrollment-goals.unmarkAchieved');
 });
+
+// ============================================================
+// 全ロール共通 設定・プロフィール
+// ============================================================
+Route::middleware('auth')
+    ->prefix('settings')
+    ->name('settings.')
+    ->group(function () {
+        Route::get('profile', [SettingsProfileController::class, 'edit'])->name('profile.edit');
+
+        Route::patch('profile', [SettingsProfileController::class, 'updateProfile'])->name('profile.update');
+
+        Route::post('avatar', [SettingsProfileController::class, 'storeAvatar'])->name('avatar.store');
+
+        Route::delete('avatar', [SettingsProfileController::class, 'destroyAvatar'])->name('avatar.destroy');
+
+        Route::put('password', [SettingsProfileController::class, 'updatePassword'])->name('password.update');
+    });
