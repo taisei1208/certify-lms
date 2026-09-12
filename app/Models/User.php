@@ -334,4 +334,24 @@ class User extends Authenticatable
     {
         return $this->hasMany(EnrollmentNote::class, 'author_user_id');
     }
+
+    /**
+     * この管理者が作成・配信したお知らせ。
+     *
+     * @return HasMany<Announcement, $this>
+     */
+    public function createdAnnouncements(): HasMany
+    {
+        return $this->hasMany(Announcement::class, 'created_by_user_id');
+    }
+
+    /**
+     * このユーザーが個別指定されたお知らせ。
+     *
+     * @return HasMany<Announcement, $this>
+     */
+    public function targetedAnnouncements(): HasMany
+    {
+        return $this->hasMany(Announcement::class, 'target_user_id');
+    }
 }

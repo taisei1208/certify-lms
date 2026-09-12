@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\Auth\OnboardingController;
 use App\Http\Controllers\BrowseController;
 use App\Http\Controllers\CertificationCatalogController;
@@ -559,6 +560,8 @@ Route::middleware(['auth', 'role:student,coach'])->group(function () {
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
 
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
+
+    Route::get('notifications/{notification}', [NotificationController::class, 'show'])->name('notifications.show');
 });
 
 // ============================================================
@@ -604,4 +607,13 @@ Route::middleware('auth')
         Route::resource('enrollment-notes', EnrollmentNoteController::class)
             ->only(['edit', 'update', 'destroy'])
             ->parameters(['enrollment-notes' => 'note']);
+    });
+
+// ============================================================
+// 管理者専用ルート — お知らせ配信
+// ============================================================
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('admin')
+    ->group(function () {
+        Route::resource('announcements', AnnouncementController::class)->only(['index', 'create', 'store', 'show'])->names('admin.announcements');
     });
