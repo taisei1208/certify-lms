@@ -8,6 +8,7 @@ use App\Http\Requests\Notification\IndexRequest;
 use App\UseCases\Notification\IndexAction;
 use App\UseCases\Notification\MarkAllAsReadAction;
 use App\UseCases\Notification\MarkAsReadAction;
+use App\UseCases\Notification\ShowAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,6 +25,13 @@ class NotificationController extends Controller
             'notifications' => $result['notifications'],
             'unreadCount' => $result['unread_count'],
             'tab' => $tab,
+        ]);
+    }
+
+    public function show(Request $request, string $notification, ShowAction $action): View
+    {
+        return view('notifications.show', [
+            'notification' => $action($request->user(), $notification),
         ]);
     }
 

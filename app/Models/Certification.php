@@ -137,6 +137,16 @@ class Certification extends Model
         return $this->hasMany(QaThread::class, 'user_id');
     }
 
+    /**
+     * この資格を対象として配信されたお知らせ。
+     *
+     * @return HasMany<Announcement, $this>
+     */
+    public function targetedAnnouncements(): HasMany
+    {
+        return $this->hasMany(Announcement::class, 'target_certification_id');
+    }
+
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', CertificationStatus::Published->value);
