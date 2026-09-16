@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -71,6 +72,16 @@ class Meeting extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(User::class, 'student_id');
+    }
+
+    /**
+     * この面談に対するリマインダー配信実績。
+     *
+     * @return HasMany<MeetingReminderDelivery, $this>
+     */
+    public function reminderDeliveries(): HasMany
+    {
+        return $this->hasMany(MeetingReminderDelivery::class);
     }
 
     /**

@@ -336,6 +336,16 @@ class User extends Authenticatable
     }
 
     /**
+     * このユーザーが受信した面談リマインダーの配信実績。
+     *
+     * @return HasMany<MeetingReminderDelivery, $this>
+     */
+    public function meetingReminderDeliveries(): HasMany
+    {
+        return $this->hasMany(MeetingReminderDelivery::class);
+    }
+
+    /**
      * この管理者が作成・配信したお知らせ。
      *
      * @return HasMany<Announcement, $this>
