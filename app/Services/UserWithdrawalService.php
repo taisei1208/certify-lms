@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Enums\UserStatus;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * ユーザー退会の物理的処理を集約する Service。
@@ -33,5 +35,16 @@ final class UserWithdrawalService
         ])->save();
 
         $user->delete();
+
+        $invalidate = static function (): void {
+            Cache::forget(config('dashboard.admin_kpi_cache_key'));
+            Cache::forget(config('dashboard.admin_completion_rate_cache_key'));
+        };
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($invalidate);
+        } else {
+            $invalidate();
+        }
     }
 }
