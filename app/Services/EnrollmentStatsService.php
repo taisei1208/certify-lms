@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\EnrollmentStatus;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +25,15 @@ class EnrollmentStatsService
      * @return array{learning_count: int, passed_count: int, failed_count: int, total: int, by_certification: array<int, array{certification_id: string, certification_name: string, learning: int, passed: int, failed: int, total: int}>}
      */
     public function adminKpi(): array
+    {
+        return Cache::remember(
+            config('dashboard.admin_kpi_cache_key'),
+            (int) config('dashboard.admin_cache_ttl'),
+            fn () => $this->calculateAdminKpi(),
+        );
+    }
+
+    private function calculateAdminKpi(): array
     {
         $counts = DB::table('enrollments')
             ->whereNull('deleted_at')
@@ -68,6 +78,15 @@ class EnrollmentStatsService
         return $result;
     }
 
+    public function completionRateByCertification(): Collection
+    {
+        return Cache::remember(
+            config('dashboard.admin_completion_rate_cache_key'),
+            (int) config('dashboard.admin_cache_ttl'),
+            fn () => $this->calculateCompletionRateByCertification(),
+        );
+    }
+
     /**
      * 資格別の修了率(passed / 全件)を Collection で返す。
      * 0 件の資格は除外する(0 % 表示は意味がないため)。
@@ -75,7 +94,7 @@ class EnrollmentStatsService
      *
      * @return Collection<int, array{certification_id: string, certification_name: string, learning: int, passed: int, failed: int, total: int, completion_rate: float}>
      */
-    public function completionRateByCertification(): Collection
+    private function calculateCompletionRateByCertification(): Collection
     {
         return collect($this->byCertification())
             ->filter(fn (array $row): bool => $row['total'] > 0)
