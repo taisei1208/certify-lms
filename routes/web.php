@@ -16,8 +16,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentGoalController;
 use App\Http\Controllers\EnrollmentManagementController;
-use App\Http\Controllers\GoogleCalendarController;
 use App\Http\Controllers\EnrollmentNoteController;
+use App\Http\Controllers\GoogleCalendarConnectionController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
 use App\Http\Controllers\MeetingController;
@@ -623,12 +623,12 @@ Route::middleware(['auth', 'role:admin'])
 // コーチ専用ルート — Google Calendar 連携（面談予約）
 // ============================================================
 Route::middleware(['auth', 'role:coach'])
-    ->prefix('setting/google-calender')
+    ->prefix('settings/google-calendar')
     ->name('settings.google-calendar.')
     ->group(function () {
-        Route::get('/connect', [GoogleCalendarController::class, 'redirect'])->name('redirect');
+        Route::get('/connect', [GoogleCalendarConnectionController::class, 'connect'])->name('redirect');
 
-        Route::get('/callback', [GoogleCalendarController::class, 'callback'])->name('callback');
+        Route::get('/callback', [GoogleCalendarConnectionController::class, 'callback'])->name('callback');
 
-        Route::get('/', [GoogleCalendarController::class, 'destroy'])->name('destroy');
+        Route::delete('/', [GoogleCalendarConnectionController::class, 'destroy'])->name('destroy');
     });

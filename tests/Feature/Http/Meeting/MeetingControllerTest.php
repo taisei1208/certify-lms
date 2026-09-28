@@ -9,14 +9,18 @@ use App\Enums\MeetingStatus;
 use App\Models\Certification;
 use App\Models\CoachAvailability;
 use App\Models\Enrollment;
+use App\Models\GoogleCalendarConnection;
 use App\Models\Meeting;
 use App\Models\User;
 use App\Notifications\MeetingCanceledNotification;
 use App\Notifications\MeetingReservedNotification;
+use App\Services\GoogleCalendarService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 class MeetingControllerTest extends TestCase
@@ -390,5 +394,334 @@ class MeetingControllerTest extends TestCase
             $canceler,
             MeetingCanceledNotification::class,
         );
+    }
+
+    public function test_store_creates_google_calendar_event_for_connected_coach(): void
+    {
+        $student = User::factory()->student()->inProgress()->create(['max_meetings' => 3]);
+
+        $admin = User::factory()->admin()->create();
+
+        $coach = User::factory()->coach()->inProgress()->create(['meeting_url' => 'https://meet.example.com/coach-room']);
+
+        $certification = Certification::factory()->published()->create();
+
+        $this->attachCoach($certification, $coach, $admin);
+
+        CoachAvailability::factory()->forCoach($coach)->onDay(Carbon::MONDAY)->timeRange('09:00:00', '18:00:00')->create();
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $scheduledAt = now()->startOfDay()->next(Carbon::MONDAY)->setTime(10, 0);
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('busyPeriods')->andReturn(collect());
+
+                $mock->shouldReceive('createMeetingEvent')->once()->andReturn('google-event-123');
+            },
+        );
+
+        $response = $this->actingAs($student)->post(
+            route('meetings.store', $enrollment),
+            [
+                'scheduled_at' => $scheduledAt->format('Y-m-d\TH:i:s'),
+                'topic' => 'Googleイベント登録確認',
+            ],
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionMissing('error');
+
+        $this->assertDatabaseHas('meetings', [
+            'student_id' => $student->id,
+            'coach_id' => $coach->id,
+            'enrollment_id' => $enrollment->id,
+            'status' => MeetingStatus::Reserved->value,
+            'google_calendar_event_id' => 'google-event-123',
+        ]);
+    }
+
+    public function test_google_event_creation_failure_does_not_cancel_meeting_reservation(): void
+    {
+        $student = User::factory()->student()->inProgress()->create(['max_meetings' => 3]);
+
+        $admin = User::factory()->admin()->create();
+
+        $coach = User::factory()->coach()->inProgress()->create(['meeting_url' => 'https://meet.example.com/coach-room']);
+
+        $certification = Certification::factory()->published()->create();
+
+        $this->attachCoach($certification, $coach, $admin);
+
+        CoachAvailability::factory()->forCoach($coach)->onDay(Carbon::MONDAY)->timeRange('09:00:00', '18:00:00')->create();
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $scheduledAt = now()->startOfDay()->next(Carbon::MONDAY)->setTime(10, 0);
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('busyPeriods')->andReturn(collect());
+
+                $mock->shouldReceive('createMeetingEvent')->once()->andThrow(new RuntimeException(
+                    'Google Calendar API error',
+                ),
+                );
+            },
+        );
+
+        $response = $this->actingAs($student)->post(
+            route('meetings.store', $enrollment),
+            [
+                'scheduled_at' => $scheduledAt->format('Y-m-d\TH:i:s'),
+                'topic' => 'Google登録失敗確認',
+            ],
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionMissing('error');
+
+        $this->assertDatabaseHas('meetings', [
+            'student_id' => $student->id,
+            'coach_id' => $coach->id,
+            'status' => MeetingStatus::Reserved->value,
+            'google_calendar_event_id' => null,
+        ]);
+
+        $this->assertDatabaseHas('meeting_quota_transactions', [
+            'user_id' => $student->id,
+            'type' => MeetingQuotaTransactionType::Consumed->value,
+            'amount' => -1,
+        ]);
+    }
+
+    public function test_cancel_deletes_google_calendar_event(): void
+    {
+        $student = User::factory()->student()->inProgress()->create(['max_meetings' => 3]);
+
+        $coach = User::factory()->coach()->inProgress()->create(['meeting_url' => 'https://meet.example.com/coach-room']);
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $meeting = Meeting::factory()->reserved()->forCoach($coach)->forStudent($student)->create([
+            'scheduled_at' => now()->addDays(3)->startOfHour(),
+            'google_calendar_event_id' => 'google-event-123',
+        ]);
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock) use ($coach): void {
+                $mock->shouldReceive('deleteMeetingEvent')->once()
+                    ->withArgs(
+                        fn (User $actualCoach, string $eventId): bool => $actualCoach->is($coach) && $eventId === 'google-event-123',
+                    );
+            },
+        );
+
+        $response = $this->actingAs($student)->post(
+            route('meetings.cancel', $meeting)
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionMissing('error');
+
+        $this->assertDatabaseHas('meetings', [
+            'student_id' => $student->id,
+            'status' => MeetingStatus::Canceled->value,
+            'google_calendar_event_id' => null,
+        ]);
+
+        $this->assertDatabaseHas('meeting_quota_transactions', [
+            'user_id' => $student->id,
+            'related_meeting_id' => $meeting->id,
+            'type' => MeetingQuotaTransactionType::Refunded->value,
+            'amount' => 1,
+        ]);
+    }
+
+    public function test_availability_excludes_slots_overlapping_google_busy_period(): void
+    {
+        $this->withoutExceptionHandling();
+        $student = User::factory()->student()->inProgress()->create();
+
+        $admin = User::factory()->admin()->create();
+
+        $coach = User::factory()->coach()->inProgress()->create();
+
+        $certification = Certification::factory()->published()->create();
+
+        $this->attachCoach($certification, $coach, $admin);
+
+        CoachAvailability::factory()->forCoach($coach)->onDay(Carbon::MONDAY)->timeRange('09:00:00', '12:00:00')->create();
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $date = now()->startOfDay()->next(Carbon::MONDAY);
+
+        /*
+         * 10:30〜11:30なので、
+         * 10:00枠と11:00枠の両方に重なる。
+         */
+        $busyStart = $date->copy()->setTime(10, 30);
+        $busyEnd = $date->copy()->setTime(11, 30);
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock) use ($busyStart, $busyEnd): void {
+                $mock->shouldReceive('busyPeriods')
+                    ->andReturn(collect([
+                        [
+                            'start' => $busyStart,
+                            'end' => $busyEnd,
+                        ],
+                    ]));
+            },
+        );
+
+        $response = $this->actingAs($student)->getJson(route('meetings.availability', $enrollment).'?date='.$date->format('Y-m-d'));
+
+        $response->assertOk();
+
+        $slotStarts = collect($response->json('slots'))->pluck('slot_start')
+            ->map(
+                fn (string $start): string => Carbon::parse($start)->format('H:i')
+            );
+
+        $this->assertContains('09:00', $slotStarts);
+        $this->assertNotContains('10:00', $slotStarts);
+        $this->assertNotContains('11:00', $slotStarts);
+    }
+
+    public function test_availability_does_not_exclude_free_google_event(): void
+    {
+        $student = User::factory()->student()->inProgress()->create();
+
+        $admin = User::factory()->admin()->create();
+
+        $coach = User::factory()->coach()->inProgress()->create();
+
+        $certification = Certification::factory()->published()->create();
+
+        $this->attachCoach($certification, $coach, $admin);
+
+        CoachAvailability::factory()->forCoach($coach)->onDay(Carbon::MONDAY)->timeRange('09:00:00', '12:00:00')->create();
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('busyPeriods')
+                    ->andReturn(collect());
+            },
+        );
+
+        $date = now()->startOfDay()->next(Carbon::MONDAY)->format('Y-m-d');
+
+        $response = $this->actingAs($student)->getJson(route('meetings.availability', $enrollment)."?date={$date}");
+
+        $response->assertOk();
+
+        $this->assertCount(3, $response->json('slots'));
+    }
+
+    public function test_availability_keeps_slot_when_one_coach_is_free(): void
+    {
+        $student = User::factory()->student()->inProgress()->create();
+
+        $admin = User::factory()->admin()->create();
+
+        $busyCoach = User::factory()->coach()->inProgress()->create();
+        $freeCoach = User::factory()->coach()->inProgress()->create();
+
+        $certification = Certification::factory()->published()->create();
+
+        $this->attachCoach($certification, $busyCoach, $admin);
+        $this->attachCoach($certification, $freeCoach, $admin);
+
+        foreach ([$busyCoach, $freeCoach] as $coach) {
+            CoachAvailability::factory()->forCoach($coach)->onDay(Carbon::MONDAY)->timeRange('09:00:00', '12:00:00')->create();
+
+            GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+        }
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+
+        $date = now()->startOfDay()->next(Carbon::MONDAY);
+
+        $busyStart = $date->copy()->setTime(10, 0);
+        $busyEnd = $date->copy()->setTime(11, 0);
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock) use ($busyCoach, $busyStart, $busyEnd): void {
+                $mock->shouldReceive('busyPeriods')
+                    ->andReturnUsing(function (User $coach) use ($busyCoach, $busyStart, $busyEnd) {
+                        if ($coach->is($busyCoach)) {
+                            return collect([
+                                [
+                                    'start' => $busyStart,
+                                    'end' => $busyEnd,
+                                ],
+                            ]);
+                        }
+
+                        return collect();
+                    });
+            },
+        );
+
+        $response = $this->actingAs($student)->getJson(route('meetings.availability', $enrollment).'?date='.$date->format('Y-m-d'));
+
+        $response->assertOk();
+
+        $slot = collect($response->json('slots'))->first(
+            fn (array $slot): bool => Carbon::parse($slot['slot_start'])->format('H:i') === '10:00',
+        );
+
+        $this->assertNotNull($slot);
+        $this->assertSame(1, $slot['available_coach_count']);
+    }
+
+    public function test_availability_falls_back_when_google_api_fails(): void
+    {
+        $student = User::factory()->student()->inProgress()->create();
+
+        $admin = User::factory()->admin()->create();
+
+        $coach = User::factory()->coach()->inProgress()->create();
+
+        $certification = Certification::factory()->published()->create();
+
+        $this->attachCoach($certification, $coach, $admin);
+
+        CoachAvailability::factory()->forCoach($coach)->onDay(Carbon::MONDAY)->timeRange('09:00:00', '12:00:00')->create();
+
+        $enrollment = Enrollment::factory()->for($student, 'user')->for($certification)->learning()->create();
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $this->mock(GoogleCalendarService::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('busyPeriods')
+                    ->andThrow(new RuntimeException(
+                        'Google Calendar API error',
+                    ),
+                    );
+            },
+        );
+
+        $date = now()->startOfDay()->next(Carbon::MONDAY)->format('Y-m-d');
+
+        $response = $this->actingAs($student)->getJson(route('meetings.availability', $enrollment)."?date={$date}");
+
+        $response->assertOk();
+
+        $this->assertCount(3, $response->json('slots'));
     }
 }

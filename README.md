@@ -162,6 +162,64 @@ sail artisan queue:retry <失敗ジョブのUUID>
 sail artisan queue:work database --queue=queue-check --sleep=1 -v
 ```
 
+## Google Calendar連携
+
+コーチはGoogleアカウントを連携することで、Googleカレンダーの予定を面談予約の空き枠へ反映できます。
+
+連携済みコーチの面談が予約されるとGoogleカレンダーへイベントが登録され、面談をキャンセルすると対応するイベントも削除されます。
+
+Google Calendar APIとの通信に失敗した場合でも、LMS上の空き枠表示・面談予約・キャンセルは継続されます。
+
+### 必要な設定
+
+Google Cloud Consoleで以下を設定します。
+
+1. プロジェクトを作成する
+2. Google Calendar APIを有効にする
+3. OAuth同意画面を設定する
+4. OAuthクライアントIDを作成する
+5. 承認済みリダイレクトURIを登録する
+6. アプリがテスト中の場合は、連携に使用するGoogleアカウントをテストユーザーへ追加する
+
+OAuthクライアントの種類には「ウェブアプリケーション」を指定します。
+
+ローカル環境の承認済みリダイレクトURIは以下です。
+
+```bash
+http://localhost:8000/settings/google-calendar/callback
+```
+
+利用する権限は以下です。
+
+```bash
+https://www.googleapis.com/auth/calendar.events
+https://www.googleapis.com/auth/calendar.events.freebusy
+```
+
+### 環境変数
+
+.envへ以下を設定します。
+
+```bash
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8000/settings/google-calendar/callback
+```
+
+Google Cloud Consoleで発行されたOAuthクライアントIDとクライアントシークレットを設定してください。
+OAuthのクライアントシークレットやアクセストークンをGitへコミットしないでください。
+設定後、Laravelの設定キャッシュを削除します。
+
+```bash
+sail artisan optimize:clear
+```
+
+### 動作確認
+
+1.コーチアカウント(coach@certify-lms.test)でログインする2.設定画面の面談設定タブを開く3.「Google Calendarと連携」を選択する
+4.Googleの認可画面でアクセスを許可する5.設定画面に「連携中」と表示されることを確認する
+6.Googleカレンダーに予定を登録する7.受講生の面談予約画面で、その予定と重なる時間が表示されないことを確認する8.面談を予約し、Googleカレンダーへイベントが登録されることを確認する9.面談をキャンセルし、Googleカレンダーからイベントが削除されることを確認する10.設定画面から連携を解除できることを確認する
+
 ## テスト
 
 ```bash

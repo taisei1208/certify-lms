@@ -16,6 +16,8 @@ return new class extends Migration
         Schema::create('google_calendar_connections', function (Blueprint $table) {
             $table->ulid('id')->primary();
             $table->foreignUlid('user_id')->unique()->constrained()->cascadeOnDelete();
+            $table->string('calendar_id')->default('primary');
+            $table->timestamp('connected_at')->nullable();
             $table->text('access_token');
             $table->text('refresh_token')->nullable();
             $table->timestamp('token_expires_at')->nullable();

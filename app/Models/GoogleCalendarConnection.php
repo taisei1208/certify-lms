@@ -17,22 +17,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class GoogleCalendarConnection extends Model
 {
-    use HasUlids;
     use HasFactory;
+    use HasUlids;
 
     protected $fillable = [
         'user_id',
+        'calender_id',
         'access_token',
         'refresh_token',
         'token_expires_at',
+        'connected_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'token_expires_at' => 'datetime',
-        ];
-    }
+    protected $casts = [
+        'token_expires_at' => 'datetime',
+        'connected_at' => 'datetime',
+    ];
 
     /**
      * @return BelongsTo<User, $this>

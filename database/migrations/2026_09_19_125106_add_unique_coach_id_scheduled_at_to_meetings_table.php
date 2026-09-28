@@ -24,7 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('meetings', function (Blueprint $table) {
-            $table->dorpUnique(['coach_id', 'scheduled_at']);
+            $table->dropUnique(['coach_id', 'scheduled_at']);
         });
     }
 };
