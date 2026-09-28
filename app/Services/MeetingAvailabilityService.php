@@ -9,11 +9,14 @@ use App\Exceptions\Mentoring\MeetingOutOfAvailabilityException;
 use App\Models\Certification;
 use App\Models\CoachAvailability;
 use App\Models\Meeting;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
- * 担当コーチ集合の面談可能時間枠を 60 分単位で展開し、空きスロットを集計する Service。
+ * 担当コーチ集合の面談可能時間枠を 60 分単位で展開し、空きスロットを Google Calendarの予定を除外して、予約可能なスロットを集計するService。。
  *
  * 受講生の予約画面が「該当資格の担当コーチ全員の有効枠 Union」を 1 日単位で取得し、
  * 既存予約済時刻 を除外して各スロットの「予約可能なコーチ数」を返す。受講生にコーチ個別は提示せず、
@@ -21,6 +24,18 @@ use Illuminate\Support\Collection;
  */
 final class MeetingAvailabilityService
 {
+    /**
+     * 同一リクエスト内で同じコーチ・同じ日の
+     * Google APIを繰り返し呼ばないためのキャッシュ。
+     *
+     * @var array<string, Collection>
+     */
+    private array $googleBusyPeriodsCache = [];
+
+    public function __construct(
+        private readonly GoogleCalendarService $googleCalendarService,
+    ) {}
+
     /**
      * 指定 Certification の担当コーチ集合について、指定日 1 日分の 60 分単位空きスロットを返す。
      *
@@ -34,11 +49,12 @@ final class MeetingAvailabilityService
         $dayEnd = $date->copy()->endOfDay();
         $dayOfWeek = $date->dayOfWeek;
 
-        $coaches = $certification->coaches()->get();
+        $coaches = $certification->coaches()->with('googleCredential')->get();
         if ($coaches->isEmpty()) {
             return collect();
         }
 
+        $coachesById = $coaches->keyBy('id');
         $coachIds = $coaches->pluck('id')->all();
 
         $availabilities = CoachAvailability::query()
@@ -70,7 +86,11 @@ final class MeetingAvailabilityService
                 $coachId = $availability->coach_id;
                 $booked = $bookedByCoach[$coachId] ?? [];
 
-                if (! in_array($slotKey, $booked, true)) {
+                $coach = $coachesById->get($coachId);
+
+                $availableOnGoogle = $coach instanceof User && $this->isCoachAvailableOnGoogle($coach, $slot);
+
+                if (! in_array($slotKey, $booked, true) && $availableOnGoogle) {
                     $slotCounts[$slotKey] = ($slotCounts[$slotKey] ?? 0) + 1;
                 }
 
@@ -107,6 +127,69 @@ final class MeetingAvailabilityService
 
         if (! $matched) {
             throw new MeetingOutOfAvailabilityException;
+        }
+    }
+
+    /**
+     * 指定した60分枠について、コーチがGoogle Calendar上で空いているかを判定する。
+     */
+    public function isCoachAvailableOnGoogle(User $coach, Carbon $scheduledAt): bool
+    {
+        $busyPeriods = $this->googleBusyPeriodsForDay($coach, $scheduledAt);
+
+        $slotStart = $scheduledAt->copy();
+        $slotEnd = $slotStart->copy()->addHour();
+
+        return ! $busyPeriods->contains(
+            function (array $busyPeriod) use ($slotStart, $slotEnd): bool {
+                $busyStart = $busyPeriod['start'];
+                $busyEnd = $busyPeriod['end'];
+
+                return $busyStart->lt($slotEnd) && $busyEnd->gt($slotStart);
+            }
+        );
+    }
+
+    /**
+     * コーチの指定日1日分のGoogle予定を取得する。
+     *
+     * 同じリクエスト内ではコーチ・日付単位で結果をキャッシュする。
+     */
+    private function googleBusyPeriodsForDay(User $coach, Carbon $date): Collection
+    {
+        $cacheKey = $coach->id.'|'.$date->format('Y-m-d');
+
+        if (
+            array_key_exists($cacheKey, $this->googleBusyPeriodsCache)
+        ) {
+            return $this->googleBusyPeriodsCache[$cacheKey];
+        }
+
+        $coach->loadMissing('googleCredential');
+
+        if ($coach->googleCredential === null) {
+            return $this->googleBusyPeriodsCache[$cacheKey] = collect();
+        }
+
+        try {
+            return $this->googleBusyPeriodsCache[$cacheKey] = $this->googleCalendarService->busyPeriods(
+                $coach,
+                $date->copy()->startOfDay(),
+                $date->copy()->endOfDay(),
+            );
+        } catch (Throwable $exception) {
+            Log::warning('Google Calendarの予定取得に失敗しました。',
+                [
+                    'coach_id' => $coach->id,
+                    'date' => $date->toDateString(),
+                    'exception' => $exception->getMessage(),
+                ],
+            );
+
+            /*
+             * Google通信失敗時は予定なしとして扱う。
+             */
+            return $this->googleBusyPeriodsCache[$cacheKey] = collect();
         }
     }
 }

@@ -17,6 +17,7 @@ use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentGoalController;
 use App\Http\Controllers\EnrollmentManagementController;
 use App\Http\Controllers\EnrollmentNoteController;
+use App\Http\Controllers\GoogleCalendarConnectionController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
 use App\Http\Controllers\MeetingController;
@@ -616,4 +617,18 @@ Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->group(function () {
         Route::resource('announcements', AnnouncementController::class)->only(['index', 'create', 'store', 'show'])->names('admin.announcements');
+    });
+
+// ============================================================
+// コーチ専用ルート — Google Calendar 連携（面談予約）
+// ============================================================
+Route::middleware(['auth', 'role:coach'])
+    ->prefix('settings/google-calendar')
+    ->name('settings.google-calendar.')
+    ->group(function () {
+        Route::get('/connect', [GoogleCalendarConnectionController::class, 'connect'])->name('redirect');
+
+        Route::get('/callback', [GoogleCalendarConnectionController::class, 'callback'])->name('callback');
+
+        Route::delete('/', [GoogleCalendarConnectionController::class, 'destroy'])->name('destroy');
     });

@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('meetings', function (Blueprint $table) {
-            $table->unique(['coach_id', 'scheduled_at']);
+            $table->string('google_calendar_event_id')->nullable()->after('coach_id');
         });
     }
 
@@ -24,7 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('meetings', function (Blueprint $table) {
-            $table->dropUnique(['coach_id', 'scheduled_at']);
+            //
         });
     }
 };

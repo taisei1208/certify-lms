@@ -13,6 +13,7 @@ use App\Models\Meeting;
 use App\Models\User;
 use App\Notifications\MeetingReservedNotification;
 use App\Services\CoachMeetingLoadService;
+use App\Services\GoogleCalendarService;
 use App\Services\MeetingAvailabilityService;
 use App\Services\MeetingQuotaService;
 use App\Services\NotificationRecipientService;
@@ -21,6 +22,7 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 final class StoreAction
@@ -31,6 +33,7 @@ final class StoreAction
         private readonly MeetingQuotaService $quotaService,
         private readonly ConsumeQuotaAction $consumeAction,
         private readonly NotificationRecipientService $recipients,
+        private readonly GoogleCalendarService $googleCalendarService,
     ) {}
 
     public function __invoke(
@@ -58,7 +61,9 @@ final class StoreAction
             $candidates = $this->findAvailableCoaches(
                 $enrollment->certification,
                 $scheduledAt,
-            );
+            )->filter(
+                fn (User $coach): bool => $this->availabilityService->isCoachAvailableOnGoogle($coach, $scheduledAt))
+                ->values();
 
             if ($candidates->isEmpty()) {
                 throw new MeetingNoAvailableCoachException;
@@ -101,6 +106,10 @@ final class StoreAction
                 });
             }
 
+            DB::afterCommit(function () use ($meeting): void {
+                $this->registerGoogleCalendarEvent($meeting);
+            });
+
             return $meeting->fresh();
         });
     }
@@ -134,6 +143,46 @@ final class StoreAction
                         ]);
                 },
             )
+            ->with('googleCredential')
             ->get();
+    }
+
+    /**
+     * 連携済みコーチのGoogleカレンダーへ面談予定を登録する。
+     *
+     * Google側で失敗しても、LMS上の面談予約は取り消さない。
+     */
+    private function registerGoogleCalendarEvent(Meeting $meeting): void
+    {
+        $meeting->loadMissing([
+            'coach.googleCredential',
+            'student',
+            'enrollment.certification',
+        ]);
+
+        $coach = $meeting->coach;
+
+        if ($coach === null || $coach->googleCredential === null) {
+            return;
+        }
+
+        try {
+            $eventId = $this->googleCalendarService
+                ->createMeetingEvent($coach, $meeting);
+
+            Meeting::query()
+                ->whereKey($meeting->getKey())
+                ->update(['google_calendar_event_id' => $eventId,
+                ]);
+        } catch (Throwable $exception) {
+            Log::warning(
+                '面談予約のGoogleカレンダーイベント登録に失敗しました。',
+                [
+                    'meeting_id' => $meeting->id,
+                    'coach_id' => $coach->id,
+                    'exception' => $exception->getMessage(),
+                ],
+            );
+        }
     }
 }
