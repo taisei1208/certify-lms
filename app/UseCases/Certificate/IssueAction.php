@@ -10,7 +10,9 @@ use App\Exceptions\Certification\EnrollmentNotPassedException;
 use App\Models\Certificate;
 use App\Models\Enrollment;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * 修了証を発行するユースケース。受講生自己発火型の修了処理 `\App\UseCases\Enrollment\ReceiveCertificateAction` から呼び出される。
@@ -27,6 +29,10 @@ final class IssueAction
      * @throws EnrollmentNotPassedException 受講登録が修了状態ではない
      * @throws CertificateAlreadyIssuedException 同一 Enrollment で修了証が既発行
      */
+    public function __construct(
+        private readonly GeneratePdfAction $generatePdfAction,
+    ) {}
+
     public function __invoke(Enrollment $enrollment): Certificate
     {
         if ($enrollment->status !== EnrollmentStatus::Passed || $enrollment->passed_at === null) {
@@ -44,13 +50,23 @@ final class IssueAction
                 throw new CertificateAlreadyIssuedException;
             }
 
-            return Certificate::create([
+            $certificate = Certificate::create([
                 'user_id' => $enrollment->user_id,
                 'enrollment_id' => $enrollment->id,
                 'certification_id' => $enrollment->certification_id,
                 'pdf_path' => 'certificates/'.Str::ulid().'.pdf',
                 'issued_at' => now(),
             ]);
+
+            try {
+                ($this->generatePdfAction)($certificate);
+            } catch (Throwable $exception) {
+                Storage::disk('private')->delete($certificate->pdf_path);
+
+                throw $exception;
+            }
+
+            return $certificate;
         });
     }
 }

@@ -14,8 +14,10 @@ use App\Models\Certification;
 use App\Models\Enrollment;
 use App\Models\EnrollmentStatusLog;
 use App\Models\User;
+use App\UseCases\Certificate\GeneratePdfAction;
+use App\UseCases\Certificate\IssueAction;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * 卒業生向けの修了証 + 過去 Enrollment 補完シーダー。
@@ -32,9 +34,15 @@ use Illuminate\Support\Str;
  * 2. **EnrollmentStatusLog 同梱**: learning → passed の遷移ログを併せて INSERT し、状態遷移履歴が成立する状態にする。
  *
  * 依存順序: `UserSeeder` → `PlanSeeder` → `CertificationSeeder` → `EnrollmentSeeder` → 本 Seeder。
+ *
+ * 修了証レコードとPDF実体を投入する。
  */
 final class CertificateSeeder extends Seeder
 {
+    public function __construct(
+        private readonly GeneratePdfAction $generatePdfAction,
+    ) {}
+
     public function run(): void
     {
         $graduatedStudents = User::query()
@@ -69,6 +77,14 @@ final class CertificateSeeder extends Seeder
             $enrollment = $this->createPastEnrollment($student, $certification, $i);
             $this->issueCertificateForEnrollment($enrollment);
         }
+
+        /*
+         * EnrollmentSeederなどが作成した既存Certificateにも
+         * PDF実体を生成する。
+         */
+        Certificate::query()->with(['user', 'certification'])->each(function (Certificate $certificate): void {
+            ($this->generatePdfAction)($certificate);
+        });
     }
 
     /**
@@ -82,51 +98,70 @@ final class CertificateSeeder extends Seeder
         $passedAt = $planExpiresAt->copy()->subDays(7);
         $startedAt = $planExpiresAt->copy()->subDays(90);
 
-        $enrollment = Enrollment::factory()
-            ->for($student)
-            ->for($certification)
-            ->state([
+        $enrollment = Enrollment::query()->updateOrCreate(
+            [
+                'user_id' => $student->id,
+                'certification_id' => $certification->id,
+            ],
+            [
                 'status' => EnrollmentStatus::Passed->value,
                 'current_term' => TermType::MockPractice->value,
                 'exam_date' => $examDate,
                 'passed_at' => $passedAt,
-            ])
-            ->create();
+            ],
+        );
 
-        $enrollment->forceFill(['created_at' => $startedAt, 'updated_at' => $passedAt])->save();
+        if ($enrollment->wasRecentlyCreated) {
+            $enrollment->forceFill(['created_at' => $startedAt, 'updated_at' => $passedAt])->save();
+        }
 
-        EnrollmentStatusLog::factory()->for($enrollment)->create([
+        EnrollmentStatusLog::query()->firstOrCreate([
+            'enrollment_id' => $enrollment->id,
             'from_status' => null,
-            'to_status' => EnrollmentStatus::Learning->value,
-            'changed_by_user_id' => $student->id,
-            'changed_at' => $startedAt,
-            'changed_reason' => '新規登録',
-        ]);
+            'to_status' => EnrollmentStatus::Learning->value],
+            [
+                'changed_by_user_id' => $student->id,
+                'changed_at' => $startedAt,
+                'changed_reason' => '新規登録',
+            ]);
 
-        EnrollmentStatusLog::factory()->for($enrollment)->create([
+        EnrollmentStatusLog::query()->firstOrCreate([
+            'enrollment_id' => $enrollment->id,
             'from_status' => EnrollmentStatus::Learning->value,
-            'to_status' => EnrollmentStatus::Passed->value,
-            'changed_by_user_id' => $student->id,
-            'changed_at' => $passedAt,
-            'changed_reason' => '受講生による修了証受領',
-        ]);
+            'to_status' => EnrollmentStatus::Passed->value],
+            [
+                'changed_by_user_id' => $student->id,
+                'changed_at' => $passedAt,
+                'changed_reason' => '受講生による修了証受領',
+            ]);
 
         return $enrollment;
     }
 
     /**
-     * Certificate を 1 件発行する。
+     * Certificate を 1 件発行、PDF実体も生成する。
      */
     private function issueCertificateForEnrollment(Enrollment $enrollment): void
     {
-        $issuedAt = $enrollment->passed_at ?? now();
+        $certificate = Certificate::query()->where('enrollment_id', $enrollment->id)->first();
 
-        $certificate = Certificate::factory()
-            ->forEnrollment($enrollment)
-            ->state([
-                'pdf_path' => 'certificates/'.Str::ulid().'.pdf',
-                'issued_at' => $issuedAt,
-            ])
-            ->create();
+        /*
+         * 未発行なら通常の発行Actionを通す。
+         * PDFも同時に生成される。
+         */
+        if ($certificate === null) {
+            app(IssueAction::class)($enrollment);
+
+            return;
+        }
+
+        /*
+         * レコードはあるがPDF実体がない場合は、
+         * 既存Certificateを使ってPDFだけ補完する。
+         */
+        if (! Storage::disk('private')->exists($certificate->pdf_path)
+        ) {
+            app(GeneratePdfAction::class)($certificate);
+        }
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\Auth\OnboardingController;
 use App\Http\Controllers\BrowseController;
+use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificationCatalogController;
 use App\Http\Controllers\CertificationCategoryController;
 use App\Http\Controllers\CertificationCoachAssignmentController;
@@ -632,3 +633,12 @@ Route::middleware(['auth', 'role:coach'])
 
         Route::delete('/', [GoogleCalendarConnectionController::class, 'destroy'])->name('destroy');
     });
+
+// ============================================================
+// 認証後の全ロール共通ルート 修了証 PDF ダウンロード
+// ============================================================
+Route::middleware('auth')->group(function () {
+    Route::get('/certificates/{certificate}/download',
+        [CertificateController::class, 'download'],
+    )->name('certificates.download');
+});
