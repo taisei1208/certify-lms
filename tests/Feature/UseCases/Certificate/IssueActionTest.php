@@ -8,7 +8,9 @@ use App\Enums\EnrollmentStatus;
 use App\Exceptions\Certification\CertificateAlreadyIssuedException;
 use App\Exceptions\Certification\EnrollmentNotPassedException;
 use App\Models\Certificate;
+use APp\Models\Certification;
 use App\Models\Enrollment;
+use App\Models\User;
 use App\UseCases\Certificate\IssueAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -99,5 +101,30 @@ class IssueActionTest extends TestCase
         }
 
         $this->assertSame(1, Certificate::query()->where('enrollment_id', $enrollment->id)->count());
+    }
+
+    public function test_issues_certificate_and_generates_pdf(): void
+    {
+        Storage::fake('private');
+
+        $student = User::factory()->student()->create();
+
+        $certification = Certification::factory()->published()->create();
+
+        $enrollment = Enrollment::factory()->for($student)->for($certification)->create([
+            'status' => EnrollmentStatus::Passed->value,
+            'passed_at' => now(),
+        ]);
+
+        $certificate = app(IssueAction::class)($enrollment);
+
+        $this->assertDatabaseHas('certificates', [
+            'id' => $certificate->id,
+            'enrollment_id' => $enrollment->id,
+        ]);
+
+        Storage::disk('private')->assertExists(
+            $certificate->pdf_path,
+        );
     }
 }
