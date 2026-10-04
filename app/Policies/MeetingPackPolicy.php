@@ -32,12 +32,14 @@ class MeetingPackPolicy
 
     public function update(User $auth, MeetingPack $plan): bool
     {
-        return $auth->role === UserRole::Admin;
+        return $auth->role === UserRole::Admin
+            && ! $plan->payments()->exists();
     }
 
     public function delete(User $auth, MeetingPack $plan): bool
     {
-        return $auth->role === UserRole::Admin;
+        return $auth->role === UserRole::Admin
+            && ! $plan->payments()->exists();
     }
 
     public function publish(User $auth, MeetingPack $plan): bool

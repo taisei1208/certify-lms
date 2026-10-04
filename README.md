@@ -220,6 +220,93 @@ sail artisan optimize:clear
 4.Googleの認可画面でアクセスを許可する5.設定画面に「連携中」と表示されることを確認する
 6.Googleカレンダーに予定を登録する7.受講生の面談予約画面で、その予定と重なる時間が表示されないことを確認する8.面談を予約し、Googleカレンダーへイベントが登録されることを確認する9.面談をキャンセルし、Googleカレンダーからイベントが削除されることを確認する10.設定画面から連携を解除できることを確認する
 
+## Stripe連携（追加面談購入）
+
+追加面談購入ではStripe CheckoutとWebhookを使用します。
+
+### 前提
+
+Stripeのテスト環境（Sandbox）を使用します。
+
+Stripe PHP SDKは導入済みです。
+
+### 環境変数
+
+Stripeダッシュボードのテスト環境から、公開可能キーとシークレットキーを取得します。
+.envへ追加してください。
+
+```.env
+STRIPE_KEY=pk_test_xxxxxxxxx
+STRIPE_SECRET=sk_test_xxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxx
+```
+
+.env.exampleにも、値を空にした状態で同じ項目を追加してください。
+
+```
+STRIPE_KEY=
+STRIPE_SECRET=
+STRIPE_WEBHOOK_SECRET=
+```
+
+環境変数を変更した後は、設定キャッシュを削除します。
+
+```bash
+sail artisan config:clear
+```
+
+## Stripe CLIのインストール
+
+macOSではHomebrewを使用できます。
+
+```bash
+brew install stripe/stripe-cli/stripe
+```
+
+インストールを確認します。
+
+```bash
+stripe version
+```
+
+## Stripe CLIへのログイン
+
+```bash
+stripe login
+```
+
+コマンド実行後に表示される案内に従い、ブラウザでStripeアカウントへの接続を許可します。
+
+## Webhookのローカル転送
+
+Laravelを起動します。
+
+```bash
+sail up -d
+```
+
+別のターミナルでStripe CLIを起動し、決済完了イベントをローカル環境へ転送します。
+
+```
+stripe listen \
+  --events checkout.session.completed \
+  --forward-to http://localhost:8000/webhooks/stripe
+```
+
+起動後、次のようなWebhook署名用シークレットが表示されます。
+whsec_xxxxxxxxx
+表示された値を.envへ設定します。
+
+```.env
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxx
+```
+
+設定後、キャッシュを削除します。
+
+```
+sail artisan config:clear
+```
+
 ## テスト
 
 ```bash
