@@ -373,4 +373,14 @@ class User extends Authenticatable
     {
         return $this->hasOne(GoogleCalendarConnection::class);
     }
+
+    /**
+     * この受講生の追加面談パック購入履歴。
+     *
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
 }

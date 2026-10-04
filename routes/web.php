@@ -23,6 +23,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LearningHourTargetController;
 use App\Http\Controllers\MeetingController;
 use App\Http\Controllers\MeetingPackController;
+use App\Http\Controllers\MeetingQuotaCheckoutController;
 use App\Http\Controllers\MeetingQuotaHistoryController;
 use App\Http\Controllers\MockExamAnswerController;
 use App\Http\Controllers\MockExamCatalogController;
@@ -49,6 +50,7 @@ use App\Http\Controllers\SectionQuizResultController;
 use App\Http\Controllers\Settings\AvailabilityController as SettingsAvailabilityController;
 use App\Http\Controllers\Settings\SettingsDefaultEnrollmentController;
 use App\Http\Controllers\SettingsProfileController;
+use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WeakDrillController;
 use App\Http\Controllers\WeakDrillResultController;
@@ -642,3 +644,25 @@ Route::middleware('auth')->group(function () {
         [CertificateController::class, 'download'],
     )->name('certificates.download');
 });
+
+// ============================================================
+// 受講生(受講中)専用 — Stripe Checkout
+// ============================================================
+Route::middleware(['auth', 'role:student', 'active-learning'])
+    ->prefix('meeting-quota')
+    ->name('meeting-quota.')
+    ->group(function (): void {
+        Route::get('/checkout', [MeetingQuotaCheckoutController::class, 'index'])->name('checkout.select');
+
+        Route::post('/checkout', [MeetingQuotaCheckoutController::class, 'store'])->name('checkout.create');
+
+        Route::get('/success', [MeetingQuotaCheckoutController::class, 'success'])->name('checkout.success');
+    });
+
+// ============================================================
+// 認証後の全ロール共通ルート 修了証 PDF ダウンロード
+// -------------------------------------------------------------
+// Stripeからのサーバー間通信なのでログイン認証は使用しない。
+// Stripe-Signatureの検証によって正当性を確認する。
+// ============================================================
+Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])->name('webhooks.stripe');

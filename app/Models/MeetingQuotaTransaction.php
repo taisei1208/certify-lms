@@ -69,12 +69,12 @@ class MeetingQuotaTransaction extends Model
      * Payment クラスが未定義となるが、`belongsTo` の class 解決は relation 実行時まで遅延されるため、
      * 関連レコードを Eager Loading しない限り問題ない。
      */
+    /**
+     * @return BelongsTo<Payment, $this>
+     */
     public function relatedPayment(): BelongsTo
     {
-        /** @var class-string<Model> $paymentClass */
-        $paymentClass = 'App\\Models\\Payment';
-
-        return $this->belongsTo($paymentClass, 'related_payment_id');
+        return $this->belongsTo(Payment::class, 'related_payment_id');
     }
 
     /**

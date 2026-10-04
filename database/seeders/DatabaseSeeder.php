@@ -37,6 +37,7 @@ class DatabaseSeeder extends Seeder
             NotificationSeeder::class,
             AnnouncementSeeder::class,
             GoogleCalendarConnectionSeeder::class,
+            PaymentSeeder::class,
         ]);
     }
 }
