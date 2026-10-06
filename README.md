@@ -183,6 +183,8 @@ Google Cloud Consoleで以下を設定します。
 
 OAuthクライアントの種類には「ウェブアプリケーション」を指定します。
 
+> 現在、Google OAuthのアクセストークンとリフレッシュトークンは暗号化せずに保存します。本番運用では、Laravelの暗号化機能や暗号化キャストなどを使用して、認証情報を暗号化して保存することを推奨します。
+
 ローカル環境の承認済みリダイレクトURIは以下です。
 
 ```bash
@@ -216,9 +218,16 @@ sail artisan optimize:clear
 
 ### 動作確認
 
-1.コーチアカウント(coach@certify-lms.test)でログインする2.設定画面の面談設定タブを開く3.「Google Calendarと連携」を選択する
-4.Googleの認可画面でアクセスを許可する5.設定画面に「連携中」と表示されることを確認する
-6.Googleカレンダーに予定を登録する7.受講生の面談予約画面で、その予定と重なる時間が表示されないことを確認する8.面談を予約し、Googleカレンダーへイベントが登録されることを確認する9.面談をキャンセルし、Googleカレンダーからイベントが削除されることを確認する10.設定画面から連携を解除できることを確認する
+1. コーチアカウント(coach@certify-lms.test)でログインする
+2. 設定画面の面談設定タブを開く
+3. 「Google Calendarと連携」を選択する
+4. Googleの認可画面でアクセスを許可する
+5. 設定画面に「連携中」と表示されることを確認する
+6. Googleカレンダーに予定を登録する
+7. 受講生の面談予約画面で、その予定と重なる時間が表示されないことを確認する
+8. 面談を予約し、Googleカレンダーへイベントが登録されることを確認する
+9. 面談をキャンセルし、Googleカレンダーからイベントが削除されることを確認する
+10. 設定画面から連携を解除できることを確認する
 
 ## Stripe連携（追加面談購入）
 
@@ -235,7 +244,7 @@ Stripe PHP SDKは導入済みです。
 Stripeダッシュボードのテスト環境から、公開可能キーとシークレットキーを取得します。
 .envへ追加してください。
 
-```.env
+```dotenv
 STRIPE_KEY=pk_test_xxxxxxxxx
 STRIPE_SECRET=sk_test_xxxxxxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxx
@@ -297,7 +306,7 @@ stripe listen \
 whsec_xxxxxxxxx
 表示された値を.envへ設定します。
 
-```.env
+```dotenv
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxx
 ```
 
@@ -323,25 +332,33 @@ AI の API キーが未設定の環境では、利用できません。
 `.env.example` を参考に、`.env` に以下を設定します。
 
 ```env
-AI_CHAT_ENABLED=true
+AI_CHAT_ENABLED=false
 GEMINI_API_KEY=取得したAPIキー
 GEMINI_MODEL=gemini-3.8-flash
 ```
 
 環境変数を変更した後は、設定キャッシュを削除します。
 
-````bash
+```bash
 sail artisan config:clear
 ```
 
-### 3. 設定キャッシュの更新
+### 3. 動作確認
+
+学習中の受講生でログインし、以下を開きます。
+
+```text
+http://localhost:8000/ai-chat
+```
+
+メッセージを送信し、Geminiから回答が表示されることを確認します。
 
 ## テスト
 
 ```bash
 sail artisan test                  # 全テスト実行
 sail artisan test --filter=Xxx    # クラス名・メソッド名で絞り込み
-````
+```
 
 ## コード整形
 
