@@ -93,6 +93,74 @@ class StripeWebhookTest extends TestCase
         $this->assertDatabaseCount('meeting_quota_transactions', 0);
     }
 
+    public function test_missing_signature_is_rejected(): void
+    {
+        $payload = json_encode([
+            'id' => 'evt_without_signature',
+            'object' => 'event',
+            'type' => 'checkout.session.completed',
+            'data' => [
+                'object' => [
+                    'id' => 'cs_without_signature',
+                    'object' => 'checkout.session',
+                ]
+            ]
+        ], JSON_THROW_ON_ERROR);
+
+        $this->call(
+            method: 'POST',
+            uri: '/webhooks/stripe',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: $payload,
+        )->assertStatus(400);
+
+        $this->assertDatabaseCount('stripe_webhook_events', 0);
+
+        $this->assertDatabaseCount('meeting_quota_transactions', 0);
+    }
+
+    public function test_different_events_for_same_payment_do_not_grant_quota_twice(): void
+    {
+        $payment = Payment::factory()->create([
+            'status' => PaymentStatus::Pending->value,
+            'stripe_checkout_session_id' => 'cs_test_same_payment',
+            'stripe_payment_intent_id' => null,
+            'quantity' => 3,
+            'amount' => 5000,
+            'currency' => 'jpy',
+        ]);
+
+        $firstPayload = $this->payload('evt_test_first', $payment);
+
+        $secondPayload = $this->payload('evt_test_second', $payment);
+
+        $this->postWebhook($firstPayload)->assertOk();
+
+        $this->postWebhook($secondPayload)->assertOk();
+
+        $this->assertDatabaseCount('stripe_webhook_events', 2);
+
+        $this->assertDatabaseHas('payments',
+            [
+                'id' => $payment->id,
+                'status' => PaymentStatus::Succeeded->value,
+            ]
+        );
+
+        $this->assertSame(1, $payment->quotaTransaction()->count());
+
+        $this->assertDatabaseHas('meeting_quota_transactions',
+            [
+                'user_id' => $payment->user_id,
+                'related_payment_id' => $payment->id,
+                'type' => MeetingQuotaTransactionType::Purchased->value,
+                'amount' => 3,
+            ]
+        );
+    }
+
     private function payload(string $eventId, Payment $payment): string
     {
         return json_encode([

@@ -724,4 +724,55 @@ class MeetingControllerTest extends TestCase
 
         $this->assertCount(3, $response->json('slots'));
     }
+
+    public function test_cancel_succeeds_when_google_event_deletion_fails(): void
+    {
+        $student = User::factory()->student()->inProgress()->create(['max_meetings' => 3]);
+
+        $coach = User::factory()->coach()->inProgress()->create();
+
+        GoogleCalendarConnection::factory()->for($coach, 'user')->create();
+
+        $meeting = Meeting::factory()->reserved()->forCoach($coach)->forStudent($student)->create([
+            'scheduled_at' => now()->addDays(3)->startOfHour(),
+            'google_calendar_event_id' => 'google-event-delete-failed',
+        ]);
+
+        $this->mock(GoogleCalendarService::class,
+        function (MockInterface $mock) use (
+            $coach,
+        ): void {
+            $mock->shouldReceive('deleteMeetingEvent')->once()->withArgs(
+                fn (
+                    User $actualCoach,
+                    string $eventId,
+                ): bool =>$actualCoach->is($coach)
+                    && $eventId
+                    === 'google-event-delete-failed',
+                )
+                ->andThrow(
+                    new RuntimeException('Google Calendar API error')
+                );
+            }
+        );
+
+        $response = $this->actingAs($student)->post(route('meetings.cancel', $meeting));
+
+        $response->assertRedirect()->assertSessionMissing('error');
+
+        $this->assertDatabaseHas('meetings', [
+            'id' => $meeting->id,
+            'status' => MeetingStatus::Canceled->value,
+            'google_calendar_event_id' =>'google-event-delete-failed',
+        ]);
+
+        $this->assertDatabaseHas('meeting_quota_transactions',
+            [
+                'user_id' => $student->id,
+                'related_meeting_id' => $meeting->id,
+                'type' => MeetingQuotaTransactionType::Refunded->value,
+                'amount' => 1
+            ]
+        );
+    }
 }
