@@ -307,12 +307,41 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxx
 sail artisan config:clear
 ```
 
+## Gemini AIチャットのセットアップ
+
+受講生向けAIチャットでは、Google Gemini APIを使用します。
+AI の API キーが未設定の環境では、利用できません。
+
+### 1. Gemini APIキーの取得
+
+[Google AI Studio](https://aistudio.google.com/app/apikey) にアクセスし、Gemini APIキーを作成します。
+
+取得したAPIキーは外部へ公開せず、ローカル環境の `.env` にのみ設定してください。
+
+### 2. 環境変数の設定
+
+`.env.example` を参考に、`.env` に以下を設定します。
+
+```env
+AI_CHAT_ENABLED=true
+GEMINI_API_KEY=取得したAPIキー
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+環境変数を変更した後は、設定キャッシュを削除します。
+
+````bash
+sail artisan config:clear
+```
+
+### 3. 設定キャッシュの更新
+
 ## テスト
 
 ```bash
 sail artisan test                  # 全テスト実行
 sail artisan test --filter=Xxx    # クラス名・メソッド名で絞り込み
-```
+````
 
 ## コード整形
 

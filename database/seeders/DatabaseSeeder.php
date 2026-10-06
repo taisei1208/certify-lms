@@ -38,6 +38,7 @@ class DatabaseSeeder extends Seeder
             AnnouncementSeeder::class,
             GoogleCalendarConnectionSeeder::class,
             PaymentSeeder::class,
+            AiChatSeeder::class,
         ]);
     }
 }

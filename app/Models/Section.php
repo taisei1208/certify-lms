@@ -80,6 +80,14 @@ class Section extends Model
         return $this->hasMany(SectionProgress::class);
     }
 
+    /**
+     * @return HasMany<AiChatConversation, $this>
+     */
+    public function aiChatConversations(): HasMany
+    {
+        return $this->hasMany(AiChatConversation::class, 'section_id');
+    }
+
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', ContentStatus::Published->value)
