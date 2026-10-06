@@ -126,7 +126,7 @@ class GoogleCalendarService
     /**
      * コーチのOAuth情報から認証済みCalendar Serviceを生成する。
      */
-    private function createAuthenticatedService(User $coach): Calendar
+    protected function createAuthenticatedService(User $coach): Calendar
     {
         $connection = $coach->googleCredential()->first();
 
@@ -187,7 +187,7 @@ class GoogleCalendarService
     /**
      * Google Calendar APIクライアントを生成する。
      */
-    private function createClient(): Client
+    protected function createClient(): Client
     {
         $client = new Client;
 

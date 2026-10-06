@@ -121,4 +121,64 @@ class GeminiServiceTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_generate_throws_exception_when_response_is_empty(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        try {
+            app(GeminiService::class)->generate($this->messages());
+
+            $this->fail(
+                '空応答時にGeminiApiExceptionが発生しませんでした。'
+            );
+        } catch (GeminiApiException $exception) {
+            $this->assertNotSame(
+                '',
+                $exception->getMessage(),
+            );
+        }
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_generate_retries_temporary_error_and_succeeds(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()->push([
+                'error' => [
+                    'message' => 'Service unavailable.',
+                ],
+            ], 503)
+                ->push([
+                    'candidates' => [
+                        [
+                            'content' => [
+                                'parts' => [
+                                    [
+                                        'text' => '再試行後の回答です。',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ], 200),
+        ]);
+
+        $result = app(GeminiService::class)->generate($this->messages());
+
+        $this->assertSame('再試行後の回答です。', $result['content']);
+
+        Http::assertSentCount(2);
+    }
 }

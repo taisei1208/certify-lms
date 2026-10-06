@@ -205,4 +205,90 @@ class GoogleCalendarConnectionControllerTest extends TestCase
             ],
         );
     }
+
+    public function test_token_exchange_failure_does_not_save_connection(): void
+    {
+        $coach = User::factory()->coach()->inProgress()->create();
+
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'error' => 'invalid_grant',
+                'error_description' => 'Authorization code is invalid.',
+            ], 400),
+        ]);
+
+        $response = $this->withSession([
+            'google_calendar_oauth_state' => 'valid-state',
+        ])
+            ->actingAs($coach)
+            ->get(
+                route(
+                    'settings.google-calendar.callback',
+                    [
+                        'state' => 'valid-state',
+                        'code' => 'invalid-authorization-code',
+                    ],
+                ),
+            );
+
+        $response->assertRedirect(
+            route('settings.availability.index'),
+        )
+            ->assertSessionHas(
+                'error', 'Google Calendarとの連携に失敗しました。',
+            );
+
+        $this->assertDatabaseMissing(
+            'google_calendar_connections',
+            ['user_id' => $coach->id]
+        );
+
+        Http::assertSentCount(1);
+
+        Http::assertSent(
+            fn ($request): bool => $request->url()
+            === 'https://oauth2.googleapis.com/token'
+            && $request['code'] === 'invalid-authorization-code'
+        );
+    }
+
+    public function test_disconnect_deletes_connection_when_revoke_fails(): void
+    {
+        $coach = User::factory()->coach()->inProgress()->create();
+
+        $connection = GoogleCalendarConnection::factory()
+            ->for($coach, 'user')
+            ->create([
+                'access_token' => 'test-access-token',
+                'refresh_token' => 'test-refresh-token',
+            ]);
+
+        Http::fake([
+            'https://oauth2.googleapis.com/revoke*' => Http::response([
+                'error' => 'server_error',
+            ], 500),
+        ]);
+
+        $response = $this->actingAs($coach)->delete(
+            route('settings.google-calendar.destroy'),
+        );
+
+        $response->assertRedirect(route('settings.availability.index'))
+            ->assertSessionHas(
+                'success', 'Google Calendarとの連携を解除しました。'
+            );
+
+        $this->assertDatabaseMissing(
+            'google_calendar_connections',
+            ['id' => $connection->id]
+        );
+
+        Http::assertSentCount(1);
+
+        Http::assertSent(fn ($request): bool => $request->url()
+            === 'https://oauth2.googleapis.com/revoke'
+            && $request['token']
+            === 'test-refresh-token',
+        );
+    }
 }
