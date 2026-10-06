@@ -739,20 +739,20 @@ class MeetingControllerTest extends TestCase
         ]);
 
         $this->mock(GoogleCalendarService::class,
-        function (MockInterface $mock) use (
-            $coach,
-        ): void {
-            $mock->shouldReceive('deleteMeetingEvent')->once()->withArgs(
-                fn (
-                    User $actualCoach,
-                    string $eventId,
-                ): bool =>$actualCoach->is($coach)
-                    && $eventId
-                    === 'google-event-delete-failed',
+            function (MockInterface $mock) use (
+                $coach,
+            ): void {
+                $mock->shouldReceive('deleteMeetingEvent')->once()->withArgs(
+                    fn (
+                        User $actualCoach,
+                        string $eventId,
+                    ): bool => $actualCoach->is($coach)
+                        && $eventId
+                        === 'google-event-delete-failed',
                 )
-                ->andThrow(
-                    new RuntimeException('Google Calendar API error')
-                );
+                    ->andThrow(
+                        new RuntimeException('Google Calendar API error')
+                    );
             }
         );
 
@@ -763,7 +763,7 @@ class MeetingControllerTest extends TestCase
         $this->assertDatabaseHas('meetings', [
             'id' => $meeting->id,
             'status' => MeetingStatus::Canceled->value,
-            'google_calendar_event_id' =>'google-event-delete-failed',
+            'google_calendar_event_id' => 'google-event-delete-failed',
         ]);
 
         $this->assertDatabaseHas('meeting_quota_transactions',
@@ -771,7 +771,7 @@ class MeetingControllerTest extends TestCase
                 'user_id' => $student->id,
                 'related_meeting_id' => $meeting->id,
                 'type' => MeetingQuotaTransactionType::Refunded->value,
-                'amount' => 1
+                'amount' => 1,
             ]
         );
     }

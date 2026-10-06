@@ -10,11 +10,11 @@ use App\Exceptions\AiChat\GeminiApiException;
 use App\Models\AiChatMessage;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
-use Illuminate\Http\Client\RequestException;
 
 /**
  * Gemini generateContent APIを扱うService。
@@ -51,8 +51,7 @@ class GeminiService
                 ->withHeaders(['x-goog-api-key' => $apiKey])
                 ->connectTimeout(5)
                 ->timeout($timeout)
-                ->retry(times: 2, sleepMilliseconds: 100, when: function (Throwable $exception,): bool
-                {
+                ->retry(times: 2, sleepMilliseconds: 100, when: function (Throwable $exception): bool {
                     if ($exception instanceof ConnectionException
                     ) {
                         return true;
@@ -60,7 +59,7 @@ class GeminiService
 
                     return $exception instanceof RequestException
                         && $exception->response->serverError();
-                    },
+                },
                     throw: false,
                 )
                 ->post($url, [

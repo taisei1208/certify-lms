@@ -103,8 +103,8 @@ class StripeWebhookTest extends TestCase
                 'object' => [
                     'id' => 'cs_without_signature',
                     'object' => 'checkout.session',
-                ]
-            ]
+                ],
+            ],
         ], JSON_THROW_ON_ERROR);
 
         $this->call(

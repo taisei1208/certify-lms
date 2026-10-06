@@ -10,10 +10,8 @@ use App\Exceptions\AiChat\GeminiApiException;
 use App\Models\AiChatMessage;
 use App\Services\GeminiService;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
-use Illuminate\Http\Client\RequestException;
 
 class GeminiServiceTest extends TestCase
 {
@@ -127,16 +125,15 @@ class GeminiServiceTest extends TestCase
     public function test_generate_throws_exception_when_response_is_empty(): void
     {
         Http::fake([
-            'generativelanguage.googleapis.com/*' =>
-                Http::response([
-                    'candidates' => [
-                        [
-                            'content' => [
-                                'parts' => []
-                            ]
-                        ]
-                    ]
-                ], 200)
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [],
+                        ],
+                    ],
+                ],
+            ], 200),
         ]);
 
         try {
@@ -158,25 +155,24 @@ class GeminiServiceTest extends TestCase
     public function test_generate_retries_temporary_error_and_succeeds(): void
     {
         Http::fake([
-            'generativelanguage.googleapis.com/*' =>
-                Http::sequence()->push([
-                    'error' => [
-                        'message' => 'Service unavailable.'
-                    ]
-                ], 503)
+            'generativelanguage.googleapis.com/*' => Http::sequence()->push([
+                'error' => [
+                    'message' => 'Service unavailable.',
+                ],
+            ], 503)
                 ->push([
                     'candidates' => [
                         [
                             'content' => [
                                 'parts' => [
                                     [
-                                        'text' => '再試行後の回答です。'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ], 200)
+                                        'text' => '再試行後の回答です。',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ], 200),
         ]);
 
         $result = app(GeminiService::class)->generate($this->messages());

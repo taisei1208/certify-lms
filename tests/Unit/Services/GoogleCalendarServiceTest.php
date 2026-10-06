@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
+use App\Models\GoogleCalendarConnection;
 use App\Models\User;
 use App\Services\GoogleCalendarService;
+use Google\Client;
 use Google\Service\Calendar;
 use Google\Service\Calendar\Resource\Events;
 use Google\Service\Exception as GoogleServiceException;
-use App\Models\GoogleCalendarConnection;
-use Google\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
-use Tests\TestCase;
 use RuntimeException;
+use Tests\TestCase;
 
 class GoogleCalendarServiceTest extends TestCase
 {
     use RefreshDatabase;
+
     public function test_delete_treats_missing_google_event_as_success(): void
     {
         $coach = new User(['name' => 'テストコーチ']);
@@ -26,7 +27,7 @@ class GoogleCalendarServiceTest extends TestCase
         $events = Mockery::mock(Events::class);
 
         $events->shouldReceive('delete')->once()
-            ->with('primary','already-deleted-event')
+            ->with('primary', 'already-deleted-event')
             ->andThrow(
                 new GoogleServiceException('Event not found.', 404)
             );
@@ -145,7 +146,7 @@ class GoogleCalendarServiceTest extends TestCase
 
                 return [
                     'error' => 'invalid_grant',
-                    'error_description' => 'Refresh token is invalid.'
+                    'error_description' => 'Refresh token is invalid.',
                 ];
             }
         };
@@ -173,7 +174,7 @@ class GoogleCalendarServiceTest extends TestCase
             $this->fail('トークン更新失敗時に例外が発生しませんでした。');
         } catch (RuntimeException $exception) {
             $this->assertSame('Googleのアクセストークン更新に失敗しました。',
-            $exception->getMessage(),
+                $exception->getMessage(),
             );
         }
 

@@ -211,33 +211,32 @@ class GoogleCalendarConnectionControllerTest extends TestCase
         $coach = User::factory()->coach()->inProgress()->create();
 
         Http::fake([
-            'https://oauth2.googleapis.com/token' =>
-                Http::response([
-                    'error' => 'invalid_grant',
-                    'error_description' =>'Authorization code is invalid.',
-                ], 400),
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'error' => 'invalid_grant',
+                'error_description' => 'Authorization code is invalid.',
+            ], 400),
         ]);
 
         $response = $this->withSession([
-            'google_calendar_oauth_state' =>'valid-state',
+            'google_calendar_oauth_state' => 'valid-state',
         ])
-        ->actingAs($coach)
-        ->get(
-            route(
-                'settings.google-calendar.callback',
-                [
-                    'state' => 'valid-state',
-                    'code' => 'invalid-authorization-code',
-                ],
-            ),
-        );
+            ->actingAs($coach)
+            ->get(
+                route(
+                    'settings.google-calendar.callback',
+                    [
+                        'state' => 'valid-state',
+                        'code' => 'invalid-authorization-code',
+                    ],
+                ),
+            );
 
         $response->assertRedirect(
             route('settings.availability.index'),
         )
-        ->assertSessionHas(
-            'error', 'Google Calendarとの連携に失敗しました。',
-        );
+            ->assertSessionHas(
+                'error', 'Google Calendarとの連携に失敗しました。',
+            );
 
         $this->assertDatabaseMissing(
             'google_calendar_connections',
@@ -252,6 +251,7 @@ class GoogleCalendarConnectionControllerTest extends TestCase
             && $request['code'] === 'invalid-authorization-code'
         );
     }
+
     public function test_disconnect_deletes_connection_when_revoke_fails(): void
     {
         $coach = User::factory()->coach()->inProgress()->create();
@@ -264,7 +264,7 @@ class GoogleCalendarConnectionControllerTest extends TestCase
             ]);
 
         Http::fake([
-            'https://oauth2.googleapis.com/revoke*' =>Http::response([
+            'https://oauth2.googleapis.com/revoke*' => Http::response([
                 'error' => 'server_error',
             ], 500),
         ]);
